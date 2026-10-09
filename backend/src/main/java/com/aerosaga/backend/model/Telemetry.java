@@ -1,14 +1,33 @@
+
 package com.aerosaga.backend.model;
 
 import java.time.LocalDateTime;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
+import jakarta.persistence.Id;
+import jakarta.persistence.Column;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+
+@Entity
+@Table(name = "telemetry")
 public class Telemetry {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "drone_id", nullable = false)
     private String droneId;
+
     private double latitude;
     private double longitude;
     private double altitude;
+
+    @Column(name = "battery_level")
     private double batteryLevel;
+
     private LocalDateTime timestamp;
 
     // No-argument constructor
@@ -19,7 +38,6 @@ public class Telemetry {
     public Telemetry(String droneId, double latitude, double longitude,
                      double altitude, double batteryLevel,
                      LocalDateTime timestamp) {
-
         this.droneId = droneId;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -29,6 +47,14 @@ public class Telemetry {
     }
 
     // Getters and Setters
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
 
     public String getDroneId() {
         return droneId;
