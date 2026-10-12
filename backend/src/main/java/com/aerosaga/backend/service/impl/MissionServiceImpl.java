@@ -12,28 +12,18 @@ import com.aerosaga.backend.model.Mission;
 import com.aerosaga.backend.model.MissionStatus;
 import com.aerosaga.backend.repository.MissionRepository;
 import com.aerosaga.backend.service.MissionService;
-import com.aerosaga.backend.worker.TemporalWorkerConfig;
-import com.aerosaga.backend.workflow.DroneMissionWorkflow;
-
-import io.temporal.client.WorkflowClient;
-import io.temporal.client.WorkflowOptions;
-import io.temporal.serviceclient.WorkflowServiceStubs;
 
 @Service
 public class MissionServiceImpl implements MissionService {
 
     private final MissionRepository missionRepository;
-    private final WorkflowClient workflowClient;
 
+    // Constructor Injection
     public MissionServiceImpl(MissionRepository missionRepository) {
         this.missionRepository = missionRepository;
-
-        WorkflowServiceStubs service =
-                WorkflowServiceStubs.newLocalServiceStubs();
-
-        this.workflowClient = WorkflowClient.newInstance(service);
     }
 
+    // Create Mission
     @Override
     public Mission createMission(Mission mission) {
 
@@ -50,34 +40,22 @@ public class MissionServiceImpl implements MissionService {
         mission.setStatus(MissionStatus.PENDING);
         mission.setCreatedAt(LocalDateTime.now());
 
-        Mission savedMission = missionRepository.save(mission);
-
-        WorkflowOptions options = WorkflowOptions.newBuilder()
-                .setTaskQueue(TemporalWorkerConfig.TASK_QUEUE)
-                .setWorkflowId("drone-mission-" + savedMission.getMissionId())
-                .build();
-
-        DroneMissionWorkflow workflow =
-                workflowClient.newWorkflowStub(
-                        DroneMissionWorkflow.class, options);
-
-        WorkflowClient.start(
-                workflow::executeMission,
-                savedMission.getMissionId());
-
-        return savedMission;
+        return missionRepository.save(mission);
     }
 
+    // Get All Missions
     @Override
     public List<Mission> getAllMissions() {
         return missionRepository.findAll();
     }
 
+    // Get Mission By ID
     @Override
     public Mission getMissionById(String missionId) {
         return missionRepository.findById(missionId).orElse(null);
     }
 
+    // Update Mission Status
     @Override
     @Transactional
     public Mission updateMissionStatus(
