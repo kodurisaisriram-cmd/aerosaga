@@ -36,4 +36,3 @@ public class DroneActivityImpl implements DroneActivity {
         log.info("Drone {} has returned to base.", droneId);
     }
 }
-```

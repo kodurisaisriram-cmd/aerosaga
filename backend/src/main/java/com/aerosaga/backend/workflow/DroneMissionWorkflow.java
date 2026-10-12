@@ -13,4 +13,3 @@ public interface DroneMissionWorkflow {
             String destination
     );
 }
-```
