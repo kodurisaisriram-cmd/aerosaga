@@ -41,7 +41,18 @@ This file contains the implementation of the drone mission workflow.
 - Declares and uses a mission ID to identify the mission.
 - Coordinates the execution flow and provides a structure for invoking drone activities.
 
-### 3. `DroneActivityImpl.java` — Supporting Integration
+### 3. `DroneActivity.java`
+
+It declares methods that a workflow can call.
+
+**Responsibilities:**
+- Execute a drone mission.
+- Take off or land.
+- Move to a target location.
+- Return mission execution results.
+- Report drone status.
+
+### 4. `DroneActivityImpl.java` — Supporting Integration
 
 This file implements the drone activity operations used by the workflow.
 
@@ -50,7 +61,7 @@ This file implements the drone activity operations used by the workflow.
 - Provides operations that can be invoked by the workflow.
 - Separates individual drone operations from the overall workflow orchestration.
 
-### 4. `TemporalWorkerConfig.java` — Supporting Integration
+### 5. `TemporalWorkerConfig.java` — Supporting Integration
 
 This file configures the Temporal worker in the application.
 
@@ -58,6 +69,16 @@ This file configures the Temporal worker in the application.
 - Configures the Temporal worker infrastructure.
 - Registers the workflow implementation and activity implementation as required.
 - Enables the worker to process workflow and activity tasks from the configured Temporal task queue.
+
+### 6. `DroneMissionRequest.java`
+
+Carrying the input data required to start a drone mission.
+
+**Responsibilities:**
+- Store mission input.
+- Transfer data between layers.
+- Support mission initialization.
+- Support request validation
 
 ## Workflow Execution
 
@@ -148,4 +169,6 @@ Actual drone communication, mission execution, monitoring, retry policies, and f
 ## Conclusion
 
 The Temporal workflow component establishes the orchestration structure for AeroSaga's drone missions. By separating workflow definitions, workflow implementation, activities, and worker configuration, the project can maintain a modular structure that is easier to test, extend, and integrate with other components.
+
+
 
