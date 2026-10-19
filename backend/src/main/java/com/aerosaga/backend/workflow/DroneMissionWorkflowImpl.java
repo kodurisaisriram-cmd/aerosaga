@@ -4,6 +4,7 @@ import com.aerosaga.backend.activity.DroneActivity;
 
 import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
+import io.temporal.failure.ActivityFailure;
 import io.temporal.workflow.Async;
 import io.temporal.workflow.Promise;
 import io.temporal.workflow.Workflow;
@@ -50,12 +51,18 @@ public class DroneMissionWorkflowImpl
             String missionId,
             List<DroneMissionRequest> requests) {
 
+                if(missionId == null || missionId.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Mission ID is required");
+        }
+
         if (requests == null || requests.isEmpty()) {
             throw new IllegalArgumentException(
                     "At least one drone is required");
         }
 
         this.missionId = missionId;
+        droneProgress.clear();
 
         Set<String> droneIds = new HashSet<>();
 
@@ -99,40 +106,37 @@ public class DroneMissionWorkflowImpl
 
         // Start every drone mission asynchronously.
         for (DroneMissionRequest request : requests) {
-            Promise<Void> promise = Async.procedure(
-                    () -> executeSingleDroneMission(request));
-
-            dronePromises.add(promise);
+            dronePromises.add(Async.procedure(
+                    () -> executeSingleDroneMission(request)));
         }
 
-        try {
-            // Wait for all drone missions to finish.
+
+            //each drone records its own outcome instead of allowing
             Promise.allOf(
                     dronePromises.toArray(
                             new Promise<?>[0]))
                     .get();
 
-            missionStatus = MissionStatus.COMPLETED;
+                    boolean allCompleted = true;
+
+        for (DroneProgress progress : droneProgress.values()) {
+                if (progress.getStatus() != DroneStatus.COMPLETED) {
+                        allCompleted = false;
+                        break;
+                }
+        }
+
+            missionStatus = allCompleted
+                    ? MissionStatus.COMPLETED
+                    : MissionStatus.FAILED;
 
             Workflow.getLogger(
                     DroneMissionWorkflowImpl.class)
                     .info(
-                            "Mission {} completed successfully",
+                            "Mission {} finished with status: {}",
                             missionId);
 
-        } catch (RuntimeException exception) {
-            missionStatus = MissionStatus.FAILED;
-
-            Workflow.getLogger(
-                    DroneMissionWorkflowImpl.class)
-                    .error(
-                            "Mission {} failed",
-                            missionId,
-                            exception);
-
-            throw exception;
-        }
-    }
+        } 
 
     private void executeSingleDroneMission(
             DroneMissionRequest request) {
@@ -148,12 +152,26 @@ public class DroneMissionWorkflowImpl
             progress.setCurrentStep("Taking off");
             activities.takeoff(droneId);
 
-            progress.setCurrentStep("Navigating");
+            progress.setCurrentStep("Navigating to destination");
             activities.navigate(droneId, destination);
 
-            progress.setCurrentStep("Dropping package");
-            activities.dropPackage(droneId);
+            progress.setCurrentStep("Delivering package");
 
+            try{
+                activities.dropPackage(droneId);
+            } catch (ActivityFailure deliveryFailure) {
+                progress.setCurrentStep("Delivery failed - recovering drone");
+                Workflow.getLogger(
+                        DroneMissionWorkflowImpl.class)
+                        .warn(
+                                "Delivery failed for drone {}. " + "Starting recovery.",
+                                droneId);
+                
+                activities.recoverDrone(droneId);
+                progress.setCurrentStep("Recovery completed - retrying delivery");
+                activities.dropPackage(droneId);
+            }
+            
             progress.setCurrentStep("Returning to base");
             activities.returnToBase(droneId);
 
@@ -178,8 +196,6 @@ public class DroneMissionWorkflowImpl
                             droneId,
                             missionId,
                             exception);
-
-            throw exception;
         }
     }
 
