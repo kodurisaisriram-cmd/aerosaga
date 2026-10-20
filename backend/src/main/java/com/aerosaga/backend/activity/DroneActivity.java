@@ -17,4 +17,7 @@ public interface DroneActivity {
 
     @ActivityMethod
     void returnToBase(String droneId);
+
+    @ActivityMethod
+    void recoverDrone(String droneId);
 }
