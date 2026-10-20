@@ -16,6 +16,7 @@ public interface MissionService {
 
     Mission updateMissionStatus(
             String missionId,
-            MissionStatus status
-    );
+            MissionStatus status);
+
+    Mission startMission(String missionId);
 }

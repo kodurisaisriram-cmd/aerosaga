@@ -1,15 +1,15 @@
 
 package com.aerosaga.backend.controller;
 
-import com.aerosaga.backend.model.Mission;
-import com.aerosaga.backend.model.MissionStatus;
-import com.aerosaga.backend.service.MissionService;
+import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import com.aerosaga.backend.model.Mission;
+import com.aerosaga.backend.model.MissionStatus;
+import com.aerosaga.backend.service.MissionService;
 
 @RestController
 @RequestMapping("/api/missions")
@@ -26,7 +26,8 @@ public class MissionController {
     public ResponseEntity<Mission> createMission(
             @RequestBody Mission mission) {
 
-        Mission createdMission = missionService.createMission(mission);
+        Mission createdMission =
+                missionService.createMission(mission);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(createdMission);
@@ -43,13 +44,12 @@ public class MissionController {
     public ResponseEntity<Mission> getMissionById(
             @PathVariable String missionId) {
 
-        Mission mission = missionService.getMissionById(missionId);
-
-        if (mission == null) {
+        try {
+            return ResponseEntity.ok(
+                    missionService.getMissionById(missionId));
+        } catch (IllegalArgumentException ex) {
             return ResponseEntity.notFound().build();
         }
-
-        return ResponseEntity.ok(mission);
     }
 
     // Update mission status
@@ -58,13 +58,48 @@ public class MissionController {
             @PathVariable String missionId,
             @RequestParam MissionStatus status) {
 
-        Mission mission = missionService.updateMissionStatus(
-                missionId, status);
+        try {
+            Mission mission = missionService.updateMissionStatus(
+                    missionId, status);
 
-        if (mission == null) {
+            return ResponseEntity.ok(mission);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    // Get mission status
+    @GetMapping("/{missionId}/status")
+    public ResponseEntity<?> getMissionStatus(
+            @PathVariable String missionId) {
+
+        try {
+            Mission mission = missionService.getMissionById(missionId);
+            return ResponseEntity.ok(
+                    java.util.Map.of(
+                            "missionId", mission.getMissionId(),
+                            "status", mission.getStatus()
+                    )
+            );
+        } catch (IllegalArgumentException ex) {
             return ResponseEntity.notFound().build();
         }
+    }
 
-        return ResponseEntity.ok(mission);
+    // Start a mission
+    @PostMapping("/{missionId}/start")
+    public ResponseEntity<Mission> startMission(
+            @PathVariable String missionId) {
+
+        try {
+            Mission mission = missionService.startMission(missionId);
+            return ResponseEntity.ok(mission);
+
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.notFound().build();
+
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
     }
 }
