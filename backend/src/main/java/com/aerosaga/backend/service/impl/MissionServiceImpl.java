@@ -121,7 +121,11 @@ public class MissionServiceImpl implements MissionService {
                                 .build());
 
         WorkflowClient.start(
-                workflow::executeMission, missionId);
+                workflow::executeMission,
+                mission.getMissionId(),
+                mission.getDroneId(),
+                mission.getDestination()
+        );
 
         mission.setStatus(MissionStatus.IN_PROGRESS);
 

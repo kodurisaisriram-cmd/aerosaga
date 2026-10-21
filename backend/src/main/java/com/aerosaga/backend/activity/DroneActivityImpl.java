@@ -1,59 +1,38 @@
 package com.aerosaga.backend.activity;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+@Component
 public class DroneActivityImpl implements DroneActivity {
 
+    private static final Logger log =
+            LoggerFactory.getLogger(DroneActivityImpl.class);
+
     @Override
-    public boolean checkDroneReadiness(String missionId) {
-        // Implement the logic to check if the drone is ready for the mission
-        System.out.println("[Aerosaga] Checking drone readiness for mission: " + missionId);
-
-        //TODO : replace with actual drone health and battery status checks
-        boolean droneReady = true;
-        
-        if(droneReady) {
-            System.out.println("[Aerosaga] Drone is ready for mission: " + missionId);
-        } else {
-            System.out.println("[Aerosaga] Drone is NOT ready for mission: " + missionId);
-        }
-        return droneReady;
+    public void takeoff(String droneId) {
+        log.info("Drone {} is taking off...", droneId);
+        log.info("Drone {} has taken off successfully.", droneId);
     }
 
-    @Override 
-    public String launchDrone(String missionId) {
-        // Implement the logic to launch the drone for the mission
-        System.out.println("[Aerosaga] Launching drone for mission: " + missionId);
-        
-        //TODO : integrate with actual drone control system.
-        return "Drone launched successfully for mission: " + missionId;
+    @Override
+    public void navigate(String droneId, String destination) {
+        log.info("Drone {} is navigating to {}...",
+                droneId, destination);
+        log.info("Drone {} reached destination {}.",
+                droneId, destination);
     }
 
-    @Override 
-    public String executeDroneMission(String missionId) {
-        // Implement the logic to execute the drone mission
-        System.out.println("[Aerosaga] Executing drone mission: " + missionId);
-        
-        //TODO : Add navigation, waypoint and telemetry logic.
-        return "Drone mission executed successfully for mission: " + missionId;
+    @Override
+    public void dropPackage(String droneId) {
+        log.info("Drone {} is dropping the package...", droneId);
+        log.info("Package dropped successfully by drone {}.", droneId);
     }
 
-    @Override 
-    public String returnDrone(String missionId) {
-        // Implement the logic to return the drone after mission completion
-        System.out.println("[Aerosaga] Returning drone for mission: " + missionId);
-        
-        //TODO : integrate with drone's return-to-home functionality.
-        return "Drone returned successfully for mission: " + missionId;
+    @Override
+    public void returnToBase(String droneId) {
+        log.info("Drone {} is returning to base...", droneId);
+        log.info("Drone {} has returned to base.", droneId);
     }
-
-    @Override 
-    public String handleMissionFailure(String missionId, String reason) {
-        // Implement the logic to handle mission failure scenarios
-        System.err.println("[Aerosaga] Mission failed: " + missionId);
-
-        System.err.println("[Aerosaga] Failure reason: " + reason);
-        
-        //TODO : implement appropriate recovery and safety procedures.
-        return "Mission failure handled for mission: " + missionId;
-    }
-
 }

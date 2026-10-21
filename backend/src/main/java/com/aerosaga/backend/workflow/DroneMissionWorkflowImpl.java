@@ -1,31 +1,49 @@
 package com.aerosaga.backend.workflow;
 
+import com.aerosaga.backend.activity.DroneActivity;
+
+import io.temporal.activity.ActivityOptions;
+import io.temporal.common.RetryOptions;
 import io.temporal.workflow.Workflow;
 
-public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
+import java.time.Duration;
+
+public class DroneMissionWorkflowImpl
+        implements DroneMissionWorkflow {
+
+    private final DroneActivity activities =
+            Workflow.newActivityStub(
+                    DroneActivity.class,
+                    ActivityOptions.newBuilder()
+                            .setStartToCloseTimeout(
+                                    Duration.ofSeconds(30))
+                            .setRetryOptions(
+                                    RetryOptions.newBuilder()
+                                            .setMaximumAttempts(3)
+                                            .build())
+                            .build()
+            );
 
     @Override
-    public void executeMission(String missionId) {
+    public void executeMission(
+            String missionId,
+            String droneId,
+            String destination) {
 
-        // Implementation of the mission execution logic goes here
-        //Log mission starts
-        Workflow.getLogger(DroneMissionWorkflowImpl.class).info("Starting drone mission : {}", missionId);
+        Workflow.getLogger(DroneMissionWorkflowImpl.class)
+                .info("Mission {} started for drone {}",
+                        missionId, droneId);
 
-        /*
-         * Mission orchestration will be added here.
-         *
-         * Future steps can include:
-         * 1. Validate mission
-         * 2. Prepare drone
-         * 3. Take off
-         * 4. Execute flight path
-         * 5. Monitor drone
-         * 6. Land drone
-         * 7. Complete mission
-         */
+        activities.takeoff(droneId);
 
-        Workflow.getLogger(DroneMissionWorkflowImpl.class).info("Drone mission completed : {}", missionId);
+        activities.navigate(droneId, destination);
 
+        activities.dropPackage(droneId);
+
+        activities.returnToBase(droneId);
+
+        Workflow.getLogger(DroneMissionWorkflowImpl.class)
+                .info("Mission {} completed successfully",
+                        missionId);
     }
-
 }

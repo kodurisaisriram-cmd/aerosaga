@@ -7,5 +7,9 @@ import io.temporal.workflow.WorkflowMethod;
 public interface DroneMissionWorkflow {
            
     @WorkflowMethod 
-    void executeMission(String missionId);
+    void executeMission(
+            String missionId,
+            String droneId,
+            String destination
+    );
 }
