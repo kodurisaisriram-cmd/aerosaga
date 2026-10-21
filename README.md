@@ -80,6 +80,35 @@ Carrying the input data required to start a drone mission.
 - Support mission initialization.
 - Support request validation
 
+### 7. `WorkerStarter.java`
+
+Starting the temporal worker so that drone mission workflow and
+activities can actually execute.
+
+
+**Responsibilities:**
+
+- Initialize the temporal connection
+- Create the worker
+- Register workflows and activities
+- Start polling for tasks
+- Keep the worker running
+
+
+### 8. `DroneProgress.java`
+
+Defining the possible execution states of an individual drone during a mission.
+
+
+**Responsibiities:**
+
+- Track individual drone progress.
+- Maintain consistent status values.
+- Support multi-drone orchestration.
+- Help generate mission progress reports.
+- Simplify status comparisons.
+
+
 ## Workflow Execution
 
 The intended workflow execution sequence is:
