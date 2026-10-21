@@ -134,7 +134,8 @@ public class DroneMissionWorkflowImpl
                     DroneMissionWorkflowImpl.class)
                     .info(
                             "Mission {} finished with status: {}",
-                            missionId);
+                            missionId,
+                            missionStatus);
 
         } 
 
