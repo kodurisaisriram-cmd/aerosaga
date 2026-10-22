@@ -95,7 +95,7 @@ activities can actually execute.
 - Keep the worker running
 
 
-### 8. `DroneProgress.java`
+### 8. `DroneStatus.java`
 
 Defining the possible execution states of an individual drone during a mission.
 
@@ -108,6 +108,33 @@ Defining the possible execution states of an individual drone during a mission.
 - Help generate mission progress reports.
 - Simplify status comparisons.
 
+
+### 9. `MissionStatus.java`
+
+Defining the possible lifecycle states of an entire mission.
+
+
+**Responsibilities**
+
+- Represent mission lifecycle states using predefined Java enum constants.
+- Track overall mission progress in temporal workflow.
+- Support mission status updates as drone activities start and finish.
+- Help REST APIs return mission status to the frontend.
+- Maintain consistent status values throughout the backend code.
+
+
+### 10. `DroneProgress.java`
+
+Storing the progress information of an individual drone within a mission.
+
+
+**Responsibilities**
+
+- Stores the drone ID associated with the mission.
+- Records whether the drone is PENDING, RUNNING, COMPLETED, or FAILED.
+- Allows each drone to have its own status within a multi-drone mission.
+- Supplies drone-level information to a parent object such as MissionProgress.
+- Helps the backend expose drone progress to the frontend when integrated with the relevant REST endpoints.
 
 ## Workflow Execution
 
