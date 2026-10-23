@@ -136,6 +136,37 @@ Storing the progress information of an individual drone within a mission.
 - Supplies drone-level information to a parent object such as MissionProgress.
 - Helps the backend expose drone progress to the frontend when integrated with the relevant REST endpoints.
 
+
+### 11. `MissionProgress.java`
+
+Storing the overall progress of a mission, including its mission ID, overall status, and the progress of individual drones.
+
+
+**Responsibilities**
+
+- Identifies which mission the progress information belongs to.
+- Stores states such as PENDING, RUNNING, COMPLETED, FAILED.
+- Stores a list of DroneProgress objects for all participating drones.
+- Allows the application to see which drones have completed their tasks and which are still running.
+- Provides structured mission progress data for workflow queries, backend responses, or frontend monitoring.
+
+
+### 12. `AeroSagaApplication.java`
+
+It is the main entry point of the Spring Boot backend application.
+It starts the application and initializes the Spring context, allowing your REST APIs, services, configurations, and other components to work together.
+
+
+**Responsibilities**
+
+- Start the Spring Boot application through the main() method.
+- Initialize the Spring application context, which manages application components and their dependencies.
+- Enable component scanning through @SpringBootApplication, allowing Spring to discover eligible controllers, services, and configurations in the relevant package hierarchy.
+- Configure auto-configuration, allowing Spring Boot to configure supported components based on project dependencies and settings.
+- Start the embedded web server, when the application is configured as a web application, so REST endpoints can receive HTTP requests.
+- Initialize backend integration, including your Temporal worker configuration if it is registered as a Spring-managed component.
+ 
+
 ## Workflow Execution
 
 The intended workflow execution sequence is:
