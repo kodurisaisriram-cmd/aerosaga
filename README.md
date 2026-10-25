@@ -41,7 +41,18 @@ This file contains the implementation of the drone mission workflow.
 - Declares and uses a mission ID to identify the mission.
 - Coordinates the execution flow and provides a structure for invoking drone activities.
 
-### 3. `DroneActivityImpl.java` — Supporting Integration
+### 3. `DroneActivity.java`
+
+It declares methods that a workflow can call.
+
+**Responsibilities:**
+- Execute a drone mission.
+- Take off or land.
+- Move to a target location.
+- Return mission execution results.
+- Report drone status.
+
+### 4. `DroneActivityImpl.java` — Supporting Integration
 
 This file implements the drone activity operations used by the workflow.
 
@@ -50,7 +61,7 @@ This file implements the drone activity operations used by the workflow.
 - Provides operations that can be invoked by the workflow.
 - Separates individual drone operations from the overall workflow orchestration.
 
-### 4. `TemporalWorkerConfig.java` — Supporting Integration
+### 5. `TemporalWorkerConfig.java` — Supporting Integration
 
 This file configures the Temporal worker in the application.
 
@@ -58,6 +69,103 @@ This file configures the Temporal worker in the application.
 - Configures the Temporal worker infrastructure.
 - Registers the workflow implementation and activity implementation as required.
 - Enables the worker to process workflow and activity tasks from the configured Temporal task queue.
+
+### 6. `DroneMissionRequest.java`
+
+Carrying the input data required to start a drone mission.
+
+**Responsibilities:**
+- Store mission input.
+- Transfer data between layers.
+- Support mission initialization.
+- Support request validation
+
+### 7. `WorkerStarter.java`
+
+Starting the temporal worker so that drone mission workflow and
+activities can actually execute.
+
+
+**Responsibilities:**
+
+- Initialize the temporal connection
+- Create the worker
+- Register workflows and activities
+- Start polling for tasks
+- Keep the worker running
+
+
+### 8. `DroneStatus.java`
+
+Defining the possible execution states of an individual drone during a mission.
+
+
+**Responsibiities:**
+
+- Track individual drone progress.
+- Maintain consistent status values.
+- Support multi-drone orchestration.
+- Help generate mission progress reports.
+- Simplify status comparisons.
+
+
+### 9. `MissionStatus.java`
+
+Defining the possible lifecycle states of an entire mission.
+
+
+**Responsibilities**
+
+- Represent mission lifecycle states using predefined Java enum constants.
+- Track overall mission progress in temporal workflow.
+- Support mission status updates as drone activities start and finish.
+- Help REST APIs return mission status to the frontend.
+- Maintain consistent status values throughout the backend code.
+
+
+### 10. `DroneProgress.java`
+
+Storing the progress information of an individual drone within a mission.
+
+
+**Responsibilities**
+
+- Stores the drone ID associated with the mission.
+- Records whether the drone is PENDING, RUNNING, COMPLETED, or FAILED.
+- Allows each drone to have its own status within a multi-drone mission.
+- Supplies drone-level information to a parent object such as MissionProgress.
+- Helps the backend expose drone progress to the frontend when integrated with the relevant REST endpoints.
+
+
+### 11. `MissionProgress.java`
+
+Storing the overall progress of a mission, including its mission ID, overall status, and the progress of individual drones.
+
+
+**Responsibilities**
+
+- Identifies which mission the progress information belongs to.
+- Stores states such as PENDING, RUNNING, COMPLETED, FAILED.
+- Stores a list of DroneProgress objects for all participating drones.
+- Allows the application to see which drones have completed their tasks and which are still running.
+- Provides structured mission progress data for workflow queries, backend responses, or frontend monitoring.
+
+
+### 12. `AeroSagaApplication.java`
+
+It is the main entry point of the Spring Boot backend application.
+It starts the application and initializes the Spring context, allowing your REST APIs, services, configurations, and other components to work together.
+
+
+**Responsibilities**
+
+- Start the Spring Boot application through the main() method.
+- Initialize the Spring application context, which manages application components and their dependencies.
+- Enable component scanning through @SpringBootApplication, allowing Spring to discover eligible controllers, services, and configurations in the relevant package hierarchy.
+- Configure auto-configuration, allowing Spring Boot to configure supported components based on project dependencies and settings.
+- Start the embedded web server, when the application is configured as a web application, so REST endpoints can receive HTTP requests.
+- Initialize backend integration, including your Temporal worker configuration if it is registered as a Spring-managed component.
+ 
 
 ## Workflow Execution
 
@@ -148,4 +256,6 @@ Actual drone communication, mission execution, monitoring, retry policies, and f
 ## Conclusion
 
 The Temporal workflow component establishes the orchestration structure for AeroSaga's drone missions. By separating workflow definitions, workflow implementation, activities, and worker configuration, the project can maintain a modular structure that is easier to test, extend, and integrate with other components.
+
+
 
