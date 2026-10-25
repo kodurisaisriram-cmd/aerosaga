@@ -355,3 +355,55 @@ footer {
     display: none;
   }
 }
+
+
+.fleet-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  padding: 16px 24px;
+}
+
+.fleet-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  background: #0e1d30;
+  border: 1px solid #233750;
+  border-radius: 12px;
+}
+
+.fleet-summary-card span {
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: #91a9c2;
+}
+
+.fleet-summary-card strong {
+  font-size: 28px;
+}
+
+.online-card strong {
+  color: #34d399;
+}
+
+.offline-card strong {
+  color: #f87171;
+}
+
+.returning-card strong {
+  color: #fbbf24;
+}
+
+.total-card strong {
+  color: #67e8f9;
+}
+
+@media (max-width: 700px) {
+  .fleet-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 12px;
+    gap: 10px;
+  }
+}

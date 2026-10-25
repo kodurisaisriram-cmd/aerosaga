@@ -32,6 +32,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- WebSocket for live drone telemetry -->
+        <dependency>
+           <groupId>org.springframework.boot</groupId>
+           <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+
         <!-- Temporal -->
         <dependency>
             <groupId>io.temporal</groupId>

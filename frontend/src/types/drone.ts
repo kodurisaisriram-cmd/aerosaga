@@ -1,5 +1,5 @@
 export type DroneStatus = "ONLINE" | "OFFLINE" | "RETURNING";
-export type MissionStep = "TAKEOFF" | "NAVIGATE" | "DROP PACKAGE" | "RETURN TO BASE";
+export type MissionStep = "TAKEOFF" | "NAVIGATE" | "DROP PACKAGE" | "RETURN TO BASE" |"OFFLINE";
 
 export interface Drone {
   id: string;
