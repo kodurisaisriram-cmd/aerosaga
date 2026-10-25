@@ -31,9 +31,7 @@ public class TemporalWorkerConfig {
 
     @Bean(destroyMethod = "shutdown")
     public WorkerFactory workerFactory(WorkflowClient client) {
-
         WorkerFactory factory = WorkerFactory.newInstance(client);
-
         Worker worker = factory.newWorker(TASK_QUEUE);
 
         worker.registerWorkflowImplementationTypes(
@@ -43,7 +41,6 @@ public class TemporalWorkerConfig {
                 new DroneActivityImpl());
 
         factory.start();
-
         return factory;
     }
 }

@@ -1,0 +1,357 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #eaf2ff;
+  background: #07111f;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    radial-gradient(circle at top right, #173557 0, transparent 35%),
+    #07111f;
+}
+
+button {
+  font: inherit;
+}
+
+.app {
+  min-height: 100vh;
+}
+
+.topbar {
+  height: 82px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #22344a;
+  background: rgba(7, 17, 31, 0.94);
+}
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #7e9bbd;
+}
+
+h1 {
+  margin: 4px 0 0;
+  font-size: 26px;
+}
+
+.fleet-summary {
+  color: #a9bfd8;
+}
+
+.live-dot,
+.status-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #36d399;
+  margin-right: 7px;
+}
+
+.dashboard {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr) 300px;
+  gap: 14px;
+  padding: 14px;
+}
+
+.drone-list,
+.details-panel,
+.map-card,
+.workflow-panel {
+  border: 1px solid #22344a;
+  background: rgba(13, 28, 47, 0.94);
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+}
+
+.drone-list {
+  overflow: hidden;
+  min-height: 580px;
+}
+
+.panel-title {
+  padding: 16px 16px 8px;
+  color: #8ea8c4;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.list-scroll {
+  max-height: 535px;
+  overflow: auto;
+  padding: 4px 8px 10px;
+}
+
+.drone-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  color: #dcecff;
+  background: transparent;
+  padding: 10px 8px;
+  border-radius: 9px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.drone-row:hover,
+.drone-row.selected {
+  background: #17304c;
+}
+
+.drone-name {
+  flex: 1;
+  font-size: 13px;
+}
+
+.battery-mini {
+  color: #7f9ab7;
+  font-size: 11px;
+}
+
+.status-dot.offline,
+.badge.offline {
+  background: #ef4444;
+}
+
+.status-dot.returning,
+.badge.returning {
+  background: #f59e0b;
+}
+
+.map-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.map-heading {
+  height: 52px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #22344a;
+}
+
+.globe-icon {
+  margin-right: 8px;
+}
+
+.live-pill {
+  font-size: 10px;
+  color: #67e8f9;
+  border: 1px solid #1f6674;
+  padding: 5px 8px;
+  border-radius: 999px;
+}
+
+.cesium-map {
+  height: 528px;
+  width: 100%;
+}
+
+.details-panel {
+  padding-bottom: 18px;
+}
+
+.details-panel h2 {
+  margin: 4px 16px 18px;
+  font-size: 22px;
+}
+
+.empty-panel p,
+.workflow-panel p {
+  color: #829ab5;
+  padding: 0 16px;
+}
+
+.status-row {
+  padding: 0 16px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #8ea8c4;
+}
+
+.badge {
+  display: inline-block;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #36d399;
+  color: #04120d;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.badge.returning {
+  color: #241500;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.metric-grid div {
+  padding: 11px;
+  background: #0a1b2f;
+  border-radius: 9px;
+}
+
+.metric-grid span {
+  display: block;
+  color: #7892ae;
+  font-size: 10px;
+  margin-bottom: 5px;
+}
+
+.metric-grid strong {
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.battery-track {
+  height: 6px;
+  margin: 18px 16px 0;
+  border-radius: 99px;
+  background: #263b52;
+  overflow: hidden;
+}
+
+.battery-track div {
+  height: 100%;
+  background: #36d399;
+}
+
+.workflow-panel {
+  margin: 0 14px 14px;
+  padding-bottom: 20px;
+}
+
+.workflow-header {
+  padding-right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.workflow-header h2 {
+  margin: 4px 16px 0;
+  font-size: 20px;
+}
+
+.workflow-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 16px;
+}
+
+.workflow-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #6f879f;
+  font-size: 13px;
+}
+
+.workflow-step.completed {
+  color: #55dba6;
+}
+
+.workflow-step.active {
+  color: #67e8f9;
+  font-weight: 800;
+}
+
+.step-icon {
+  width: 20px;
+}
+
+.step-arrow {
+  color: #47617c;
+  margin-left: 4px;
+}
+
+.warning {
+  margin: 0 16px;
+  padding: 12px;
+  border: 1px solid #70551f;
+  border-radius: 9px;
+  color: #f8d47c;
+  background: #2a2110;
+  font-size: 12px;
+}
+
+footer {
+  text-align: center;
+  color: #607892;
+  padding: 0 14px 18px;
+  font-size: 11px;
+}
+
+@media (max-width: 1000px) {
+  .dashboard {
+    grid-template-columns: 190px minmax(0, 1fr);
+  }
+
+  .details-panel {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 700px) {
+  .topbar {
+    height: auto;
+    padding: 16px;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .drone-list {
+    min-height: 220px;
+  }
+
+  .list-scroll {
+    max-height: 180px;
+  }
+
+  .cesium-map {
+    height: 430px;
+  }
+
+  .workflow-steps {
+    display: block;
+  }
+
+  .workflow-step {
+    margin-bottom: 10px;
+  }
+
+  .step-arrow {
+    display: none;
+  }
+}

@@ -3,6 +3,7 @@ package com.aerosaga.backend.service.impl;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import com.aerosaga.backend.workflow.DroneMissionRequest;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -120,13 +121,16 @@ public class MissionServiceImpl implements MissionService {
                                         TemporalWorkerConfig.TASK_QUEUE)
                                 .build());
 
-        WorkflowClient.start(
-                workflow::executeMission,
-                mission.getMissionId(),
-                mission.getDroneId(),
-                mission.getDestination()
-        );
+DroneMissionRequest request = new DroneMissionRequest(
+        mission.getDroneId(),
+        mission.getDestination()
+);
 
+WorkflowClient.start(
+        workflow::executeMission,
+        mission.getMissionId(),
+        List.of(request)
+);
         mission.setStatus(MissionStatus.IN_PROGRESS);
 
         return missionRepository.save(mission);

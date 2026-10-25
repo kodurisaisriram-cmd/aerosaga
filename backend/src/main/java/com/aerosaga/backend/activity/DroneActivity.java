@@ -1,9 +1,9 @@
+
 package com.aerosaga.backend.activity;
 
 import io.temporal.activity.ActivityInterface;
 import io.temporal.activity.ActivityMethod;
 
-//defines activities that can be executed during a drone mission.
 @ActivityInterface
 public interface DroneActivity {
 
@@ -18,4 +18,7 @@ public interface DroneActivity {
 
     @ActivityMethod
     void returnToBase(String droneId);
+
+    @ActivityMethod
+    void recoverDrone(String droneId);
 }
