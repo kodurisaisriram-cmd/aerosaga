@@ -1,261 +1,94 @@
- # AeroSaga – Drone Mission Workflow
+# AeroSaga — Drone Mission Control System
 
-## Overview
+AeroSaga is a drone mission orchestration project built with Java, Spring Boot, and Temporal. It combines mission management, drone activity orchestration, and real-time GPS telemetry integration.
 
-AeroSaga is a drone mission orchestration project designed to coordinate drone operations using **Java, Spring Boot, and Temporal**. Temporal provides workflow orchestration to manage mission execution and coordinate activities in a structured manner.
+## Documentation
 
-This documentation describes my contribution to the Temporal workflow component of the AeroSaga project.
+- **Frontend Integration & Telemetry Guide:** [docs/FRONTEND_INTEGRATION_GUIDE.md](docs/FRONTEND_INTEGRATION_GUIDE.md) — REST endpoints, STOMP WebSocket topics, message schemas, and frontend integration details.
+- **Temporal Workflow and Drone Mission Orchestration:** This README documents the workflow structure and supporting components.
 
-## My Contribution
+## Temporal Workflow Overview
 
-**Module:** Temporal Workflow and Drone Mission Orchestration
+The Temporal workflow coordinates drone mission execution through workflow definitions, activities, and worker configuration.
 
-My responsibilities include:
+### Main Components
 
-- Creating the drone mission workflow interface.
-- Implementing the workflow execution logic.
-- Defining the mission execution method.
-- Integrating the workflow with Temporal.
-- Supporting mission identification using a mission ID.
-- Preparing the workflow structure for coordination with drone activities.
-
-## Files Worked On
-
-### 1. `DroneMissionWorkflow.java`
-
-This file defines the workflow interface for drone mission execution.
-
-**Responsibilities:**
-- Declares the workflow contract.
-- Defines the `executeMission()` method.
-- Provides the entry point for starting a drone mission workflow.
-- Uses Temporal workflow annotations to identify the workflow.
-
-### 2. `DroneMissionWorkflowImpl.java`
-
-This file contains the implementation of the drone mission workflow.
-
-**Responsibilities:**
-- Implements the `DroneMissionWorkflow` interface.
-- Defines the mission execution logic.
-- Declares and uses a mission ID to identify the mission.
-- Coordinates the execution flow and provides a structure for invoking drone activities.
-
-### 3. `DroneActivity.java`
-
-It declares methods that a workflow can call.
-
-**Responsibilities:**
-- Execute a drone mission.
-- Take off or land.
-- Move to a target location.
-- Return mission execution results.
-- Report drone status.
-
-### 4. `DroneActivityImpl.java` — Supporting Integration
-
-This file implements the drone activity operations used by the workflow.
-
-**Responsibilities:**
-- Contains the implementation of drone-related activity methods.
-- Provides operations that can be invoked by the workflow.
-- Separates individual drone operations from the overall workflow orchestration.
-
-### 5. `TemporalWorkerConfig.java` — Supporting Integration
-
-This file configures the Temporal worker in the application.
-
-**Responsibilities:**
-- Configures the Temporal worker infrastructure.
-- Registers the workflow implementation and activity implementation as required.
-- Enables the worker to process workflow and activity tasks from the configured Temporal task queue.
-
-### 6. `DroneMissionRequest.java`
-
-Carrying the input data required to start a drone mission.
-
-**Responsibilities:**
-- Store mission input.
-- Transfer data between layers.
-- Support mission initialization.
-- Support request validation
-
-### 7. `WorkerStarter.java`
-
-Starting the temporal worker so that drone mission workflow and
-activities can actually execute.
-
-
-**Responsibilities:**
-
-- Initialize the temporal connection
-- Create the worker
-- Register workflows and activities
-- Start polling for tasks
-- Keep the worker running
-
-
-### 8. `DroneStatus.java`
-
-Defining the possible execution states of an individual drone during a mission.
-
-
-**Responsibiities:**
-
-- Track individual drone progress.
-- Maintain consistent status values.
-- Support multi-drone orchestration.
-- Help generate mission progress reports.
-- Simplify status comparisons.
-
-
-### 9. `MissionStatus.java`
-
-Defining the possible lifecycle states of an entire mission.
-
-
-**Responsibilities**
-
-- Represent mission lifecycle states using predefined Java enum constants.
-- Track overall mission progress in temporal workflow.
-- Support mission status updates as drone activities start and finish.
-- Help REST APIs return mission status to the frontend.
-- Maintain consistent status values throughout the backend code.
-
-
-### 10. `DroneProgress.java`
-
-Storing the progress information of an individual drone within a mission.
-
-
-**Responsibilities**
-
-- Stores the drone ID associated with the mission.
-- Records whether the drone is PENDING, RUNNING, COMPLETED, or FAILED.
-- Allows each drone to have its own status within a multi-drone mission.
-- Supplies drone-level information to a parent object such as MissionProgress.
-- Helps the backend expose drone progress to the frontend when integrated with the relevant REST endpoints.
-
-
-### 11. `MissionProgress.java`
-
-Storing the overall progress of a mission, including its mission ID, overall status, and the progress of individual drones.
-
-
-**Responsibilities**
-
-- Identifies which mission the progress information belongs to.
-- Stores states such as PENDING, RUNNING, COMPLETED, FAILED.
-- Stores a list of DroneProgress objects for all participating drones.
-- Allows the application to see which drones have completed their tasks and which are still running.
-- Provides structured mission progress data for workflow queries, backend responses, or frontend monitoring.
-
-
-### 12. `AeroSagaApplication.java`
-
-It is the main entry point of the Spring Boot backend application.
-It starts the application and initializes the Spring context, allowing your REST APIs, services, configurations, and other components to work together.
-
-
-**Responsibilities**
-
-- Start the Spring Boot application through the main() method.
-- Initialize the Spring application context, which manages application components and their dependencies.
-- Enable component scanning through @SpringBootApplication, allowing Spring to discover eligible controllers, services, and configurations in the relevant package hierarchy.
-- Configure auto-configuration, allowing Spring Boot to configure supported components based on project dependencies and settings.
-- Start the embedded web server, when the application is configured as a web application, so REST endpoints can receive HTTP requests.
-- Initialize backend integration, including your Temporal worker configuration if it is registered as a Spring-managed component.
- 
+- `DroneMissionWorkflow.java` — Defines the workflow contract and mission execution entry point.
+- `DroneMissionWorkflowImpl.java` — Implements the workflow execution logic.
+- `DroneActivity.java` — Declares drone operations invoked by the workflow.
+- `DroneActivityImpl.java` — Implements the drone activity operations.
+- `TemporalWorkerConfig.java` — Configures the Temporal worker and registers workflow and activity implementations.
+- `WorkerStarter.java` — Provides worker or workflow startup functionality as implemented in the project.
+- `DroneMissionRequest.java` — Represents input data for a drone mission.
+- `DroneStatus.java` — Defines possible drone execution states.
+- `MissionStatus.java` — Defines mission lifecycle states.
+- `DroneProgress.java` — Tracks the progress of an individual drone.
+- `MissionProgress.java` — Represents overall mission progress and individual drone progress.
 
 ## Workflow Execution
 
-The intended workflow execution sequence is:
+The intended execution flow is:
 
-1. A drone mission is initiated.
-2. The Temporal workflow starts executing.
-3. A mission ID is assigned or received to identify the mission.
-4. The workflow coordinates the required drone activities.
-5. The Temporal worker processes workflow and activity tasks.
-6. The mission execution flow completes or reports an error, depending on the implemented logic.
+1. A mission is initiated.
+2. The Temporal workflow begins execution.
+3. The workflow coordinates the required drone activities.
+4. The Temporal worker processes workflow and activity tasks.
+5. Mission progress is updated as execution proceeds.
+6. The mission completes or reports a failure, depending on the implemented logic.
 
-## Setup and Build
-
-### Prerequisites
+## Prerequisites
 
 Install the following tools:
 
-- Java Development Kit (JDK) compatible with the project configuration
-- Apache Maven 3.9.x
+- Java Development Kit (JDK 21 for this project)
+- Apache Maven
 - Docker Desktop
 - Git
-- An IDE such as IntelliJ IDEA or Eclipse
+- Node.js and npm for the frontend
 
-### Build the Project
+## Setup and Build
 
-Open a terminal in the project root directory and run:
-
-```bash
-mvn clean compile
-```
-
-To package the application, run:
-
-```bash
-mvn clean package
-```
-
-### Start Docker Services
-
-If the project uses Docker Compose to run Temporal and its supporting services, start them with:
+Run Docker services from the project root:
 
 ```bash
 docker compose up -d
-```
-
-Check the service status:
-
-```bash
 docker compose ps
 ```
 
-The required services should be running before testing the application.
+Build the backend from the `backend` directory:
 
-### Run the Spring Boot Application
+```bash
+mvn clean test
+```
 
-Run the application using Maven:
+To run the Spring Boot backend:
 
 ```bash
 mvn spring-boot:run
 ```
 
-Alternatively, run the main Spring Boot application class from your IDE.
+To run the frontend, open a separate terminal in the `frontend` directory:
+
+```bash
+npm install
+npm run dev
+```
+
+Ensure the required services, including Temporal and PostgreSQL, are running and correctly configured before testing mission execution.
 
 ## Testing and Verification
 
-Verify the implementation by checking:
-
-- The Maven build completes successfully.
-- Docker Compose services are running.
-- The Temporal server is accessible.
-- The worker starts without configuration errors.
-- The workflow is registered with the worker.
-- A mission workflow can be started and its execution observed in Temporal.
+- Verify that the Maven build and tests complete successfully.
+- Confirm that the Docker services are running.
+- Check that the Temporal server is accessible.
+- Verify that the worker starts without configuration errors.
+- Test the mission APIs and telemetry integration.
+- Confirm that workflow progress and status are reported as expected.
 
 ## Team Collaboration
 
-This work is part of the AeroSaga team project. The workflow module is designed to work with the activity and configuration modules developed within the shared repository.
-
-Changes are tracked using Git and committed to GitHub so that other team members can review and integrate them.
+AeroSaga is a collaborative team project. The backend workflow, mission APIs, telemetry, and frontend are integrated through shared Git branches and reviewed changes.
 
 ## Current Scope
 
-The contribution documented here focuses on the Temporal workflow structure and its supporting integration with drone activities.
-
-Actual drone communication, mission execution, monitoring, retry policies, and failure recovery depend on the functionality implemented in the corresponding project modules.
-
-## Conclusion
-
-The Temporal workflow component establishes the orchestration structure for AeroSaga's drone missions. By separating workflow definitions, workflow implementation, activities, and worker configuration, the project can maintain a modular structure that is easier to test, extend, and integrate with other components.
-
-
-
+The project combines Temporal-based workflow orchestration with mission management and telemetry integration. Actual drone communication and execution depend on the functionality implemented in the relevant modules.

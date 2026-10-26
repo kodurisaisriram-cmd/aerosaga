@@ -3,12 +3,12 @@ package com.aerosaga.backend.model;
 
 import java.time.LocalDateTime;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import jakarta.persistence.Id;
 import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "telemetry")
@@ -21,6 +21,9 @@ public class Telemetry {
     @Column(name = "drone_id", nullable = false)
     private String droneId;
 
+    @Column(name = "mission_id")
+    private String missionId;
+
     private double latitude;
     private double longitude;
     private double altitude;
@@ -30,14 +33,17 @@ public class Telemetry {
 
     private LocalDateTime timestamp;
 
-    // No-argument constructor
     public Telemetry() {
     }
 
-    // Parameterized constructor
-    public Telemetry(String droneId, double latitude, double longitude,
-                     double altitude, double batteryLevel,
-                     LocalDateTime timestamp) {
+    public Telemetry(
+            String droneId,
+            double latitude,
+            double longitude,
+            double altitude,
+            double batteryLevel,
+            LocalDateTime timestamp) {
+
         this.droneId = droneId;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -45,8 +51,6 @@ public class Telemetry {
         this.batteryLevel = batteryLevel;
         this.timestamp = timestamp;
     }
-
-    // Getters and Setters
 
     public Long getId() {
         return id;
@@ -62,6 +66,14 @@ public class Telemetry {
 
     public void setDroneId(String droneId) {
         this.droneId = droneId;
+    }
+
+    public String getMissionId() {
+        return missionId;
+    }
+
+    public void setMissionId(String missionId) {
+        this.missionId = missionId;
     }
 
     public double getLatitude() {

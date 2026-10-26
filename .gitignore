@@ -1,1 +1,11 @@
+
+# Frontend dependencies
 frontend/node_modules/
+
+# Maven build output
+**/target/
+
+# IDE files
+.classpath
+.project
+.settings/

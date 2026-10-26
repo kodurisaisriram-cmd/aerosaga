@@ -16,34 +16,38 @@ public class TelemetryController {
 
     private final TelemetryService telemetryService;
 
-    // Constructor Injection
     public TelemetryController(TelemetryService telemetryService) {
         this.telemetryService = telemetryService;
     }
 
-    // Save telemetry data
+    // Save telemetry and publish live updates.
     @PostMapping
-    public ResponseEntity<Telemetry> saveTelemetry(
+    public ResponseEntity<?> saveTelemetry(
             @RequestBody Telemetry telemetry) {
+        try {
+            Telemetry savedTelemetry =
+                    telemetryService.saveTelemetry(telemetry);
 
-        Telemetry savedTelemetry =
-                telemetryService.saveTelemetry(telemetry);
+            return ResponseEntity
+                    .status(HttpStatus.CREATED)
+                    .body(savedTelemetry);
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(savedTelemetry);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(ex.getMessage());
+        }
     }
 
-    // Get all telemetry records
+    // Get all telemetry records.
     @GetMapping
     public ResponseEntity<List<Telemetry>> getAllTelemetry() {
-
         return ResponseEntity.ok(
                 telemetryService.getAllTelemetry()
         );
     }
 
-    // Get telemetry history of a drone
+    // Get telemetry history of a drone.
     @GetMapping("/drone/{droneId}")
     public ResponseEntity<List<Telemetry>> getTelemetryByDroneId(
             @PathVariable String droneId) {
@@ -53,7 +57,7 @@ public class TelemetryController {
         );
     }
 
-    // Get latest telemetry of a drone
+    // Get latest telemetry of a drone.
     @GetMapping("/drone/{droneId}/latest")
     public ResponseEntity<Telemetry> getLatestTelemetry(
             @PathVariable String droneId) {
