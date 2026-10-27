@@ -25,6 +25,8 @@ public class DroneMissionWorkflowImpl
 
     private String missionId;
 
+    private boolean emergencyAbortRequested = false;
+
     private final Map<String, DroneProgress> droneProgress =
             new LinkedHashMap<>();
 
@@ -45,6 +47,22 @@ public class DroneMissionWorkflowImpl
                                             .build())
                             .build()
             );
+
+    @Override 
+        public void requestEmergencyAbort() {
+          if (missionStatus == MissionStatus.RUNNING && !emergencyAbortRequested) {
+                emergencyAbortRequested = true;
+                missionStatus = MissionStatus.ABORT_REQUESTED;
+
+                Workflow.getLogger(
+                        DroneMissionWorkflowImpl.class)
+                        .warn(
+                                "Emergency abort requested for mission {}",
+                                missionId);
+          }
+         }
+
+
 
     @Override
     public void executeMission(
@@ -92,7 +110,9 @@ public class DroneMissionWorkflowImpl
             );
         }
 
-        missionStatus = MissionStatus.RUNNING;
+        missionStatus = emergencyAbortRequested
+                ? MissionStatus.ABORT_REQUESTED
+                : MissionStatus.RUNNING;
 
         Workflow.getLogger(
                 DroneMissionWorkflowImpl.class)
@@ -118,17 +138,33 @@ public class DroneMissionWorkflowImpl
                     .get();
 
                     boolean allCompleted = true;
+                    boolean anyFailed = false;
+                    boolean anyAborted = false;
 
         for (DroneProgress progress : droneProgress.values()) {
                 if (progress.getStatus() != DroneStatus.COMPLETED) {
                         allCompleted = false;
-                        break;
+                }
+                if (progress.getStatus() == DroneStatus.FAILED) {
+                        anyFailed = true;
+                }
+                if (progress.getStatus() == DroneStatus.ABORTED) {
+                        anyAborted = true;
                 }
         }
 
-            missionStatus = allCompleted
-                    ? MissionStatus.COMPLETED
-                    : MissionStatus.FAILED;
+        if (anyFailed) {
+                missionStatus = MissionStatus.FAILED;
+        } 
+          else if (emergencyAbortRequested || anyAborted) {
+            missionStatus = MissionStatus.ABORTED;
+        } 
+           else if (allCompleted) {
+            missionStatus = MissionStatus.COMPLETED;
+        }
+           else {
+            missionStatus = MissionStatus.FAILED;
+        }
 
             Workflow.getLogger(
                     DroneMissionWorkflowImpl.class)
@@ -148,19 +184,35 @@ public class DroneMissionWorkflowImpl
         DroneProgress progress = droneProgress.get(droneId);
 
         try {
+                if (stopForEmergencyAbort(progress, droneId)) {
+                    return;
+                }
+
             progress.setStatus(DroneStatus.RUNNING);
 
             progress.setCurrentStep("Taking off");
             activities.takeoff(droneId);
 
+            if (stopForEmergencyAbort(progress, droneId)) {
+                return;
+            }
+
             progress.setCurrentStep("Navigating to destination");
             activities.navigate(droneId, destination);
+
+            if (stopForEmergencyAbort(progress, droneId)) {
+                return;
+            }
 
             progress.setCurrentStep("Delivering package");
 
             try{
                 activities.dropPackage(droneId);
             } catch (ActivityFailure deliveryFailure) {
+                if (stopForEmergencyAbort(progress, droneId)) {
+                return;
+            }
+
                 progress.setCurrentStep("Delivery failed - recovering drone");
                 Workflow.getLogger(
                         DroneMissionWorkflowImpl.class)
@@ -169,8 +221,16 @@ public class DroneMissionWorkflowImpl
                                 droneId);
                 
                 activities.recoverDrone(droneId);
+                if (stopForEmergencyAbort(progress, droneId)) {
+                return;
+            }
+
                 progress.setCurrentStep("Recovery completed - retrying delivery");
                 activities.dropPackage(droneId);
+            }
+
+            if (stopForEmergencyAbort(progress, droneId)) {
+                return;
             }
             
             progress.setCurrentStep("Returning to base");
