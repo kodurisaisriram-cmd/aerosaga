@@ -4,6 +4,5 @@ public enum DroneStatus {
     PENDING,
     RUNNING,
     COMPLETED,
-    FAILED,
-    ABORTED
+    FAILED
 }
