@@ -27,6 +27,10 @@ public class DroneMissionWorkflowImpl
 
     private boolean emergencyAbortRequested = false;
 
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
     private final Map<String, DroneProgress> droneProgress =
             new LinkedHashMap<>();
 
@@ -258,6 +262,48 @@ public class DroneMissionWorkflowImpl
                             missionId,
                             exception);
         }
+    }
+
+    private boolean stopForEmergencyAbort(DroneProgress progress, String droneId) {
+        if (!emergencyAbortRequested) {
+            return false;
+        }
+
+        if (progress.getStatus() == DroneStatus.COMPLETED
+                || progress.getStatus() == DroneStatus.FAILED
+                || progress.getStatus() == DroneStatus.ABORTED) {
+                return true;
+        }
+        
+        missionStatus = MissionStatus.ABORTING;
+
+        progress.setCurrentStep("Emergency abort - stopping mission");
+
+        try{
+                /*
+                * If takeoff has not started, no return operation is needed.
+                * Otherwise use the existing returnToBase activity.
+                * A real drone integration should select the appropriate safety action based on verified drone state.
+                */
+               if (!"Waiting to start".equals(progress.getCurrentStep())) {
+                   activities.returnToBase(droneId);
+               }
+
+               progress.setCurrentStep("Aborted");
+
+               Workflow.getLogger(DroneMissionWorkflowImpl.class)
+                       .warn("Drone {} safely aborted in mission {}",
+                               droneId, missionId);
+        }
+        catch (RuntimeException safetyFailure) {
+            progress.setCurrentStep("Emergency safety operation failed");
+            progress.setStatus(DroneStatus.FAILED);
+
+            Workflow.getLogger(DroneMissionWorkflowImpl.class)
+                    .error("Emergency safety operation failed for drone {}",
+                            droneId, safetyFailure);
+        }
+                            return true;
     }
 
     @Override
