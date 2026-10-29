@@ -1,7 +1,5 @@
 package com.aerosaga.backend.activity;
 
-import io.temporal.activity.Activity;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -97,8 +95,7 @@ public class DroneActivityImpl implements DroneActivity {
                 droneId
         );
 
-        // TODO: Replace this simulation with the actual drone
-        // recovery, repositioning, or safe-state operation.
+        
 
         log.info(
                 "Recovery operation completed for drone {}",

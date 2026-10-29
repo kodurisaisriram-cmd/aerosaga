@@ -27,11 +27,7 @@ public class DroneMissionWorkflowImpl
 
     private boolean emergencyAbortRequested = false;
 
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
-    private final Map<String, DroneProgress> droneProgress =
+      private final Map<String, DroneProgress> droneProgress =
             new LinkedHashMap<>();
 
     private final DroneActivity activities =
