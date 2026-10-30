@@ -178,6 +178,20 @@ The intended workflow execution sequence is:
 5. The Temporal worker processes workflow and activity tasks.
 6. The mission execution flow completes or reports an error, depending on the implemented logic.
 
+
+## Emergency Abort Workflow
+
+The emergency abort process follows these steps :
+
+1. A drone mission starts through the temporal workflow.
+2. The workflow executes multiple drone activities.
+3. An emergency abort request is recieved through the temporal signal.
+4. The workflow updates its emergency abort flag.
+5. The workflow checks the abort request at safe points between mission activities.
+6. New normal mission activities are prevented after the abort is accepted.
+7. The appropriate safety activity is executed.
+8. Drone progress and mission status are updated according to the actual outcome.
+
 ## Setup and Build
 
 ### Prerequisites
