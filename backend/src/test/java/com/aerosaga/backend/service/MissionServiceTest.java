@@ -95,16 +95,97 @@ public class MissionServiceTest {
 
         Mission started = missionService.startMission("m-1");
 
-        assertEquals(MissionStatus.IN_PROGRESS, started.getStatus());
+        assertEquals(MissionStatus.ACTIVE, started.getStatus());
+        assertEquals("Taking off", started.getCurrentStep());
+        assertEquals(10.0, started.getProgress());
+        assertEquals("NOT_STARTED", started.getRecoveryStatus());
         verify(workflowClient).newWorkflowStub(eq(DroneMissionWorkflow.class), any(WorkflowOptions.class));
         verify(missionRepository).save(mission);
     }
 
     @Test
     void testStartMission_NotPending_ThrowsException() {
-        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.IN_PROGRESS, LocalDateTime.now());
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, LocalDateTime.now());
         when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
 
         assertThrows(IllegalStateException.class, () -> missionService.startMission("m-1"));
+    }
+
+    @Test
+    void testUpdateMissionStatus_ReturningToBase() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission updated = missionService.updateMissionStatus("m-1", MissionStatus.RETURNING_TO_BASE);
+
+        assertEquals(MissionStatus.RETURNING_TO_BASE, updated.getStatus());
+        assertEquals("RETURNING_TO_BASE", updated.getRecoveryStatus());
+        assertEquals("Returning to base", updated.getCurrentStep());
+        assertEquals(90.0, updated.getProgress());
+    }
+
+    @Test
+    void testUpdateMissionStatus_Completed() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.RETURNING_TO_BASE, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission updated = missionService.updateMissionStatus("m-1", MissionStatus.COMPLETED);
+
+        assertEquals(MissionStatus.COMPLETED, updated.getStatus());
+        assertEquals("COMPLETED", updated.getRecoveryStatus());
+        assertEquals("Completed", updated.getCurrentStep());
+        assertEquals(100.0, updated.getProgress());
+    }
+
+    @Test
+    void testUpdateMissionProgress_Success() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission updated = missionService.updateMissionProgress("m-1", 65.0, "Dropping package", "IN_PROGRESS");
+
+        assertEquals(65.0, updated.getProgress());
+        assertEquals("Dropping package", updated.getCurrentStep());
+        assertEquals("IN_PROGRESS", updated.getRecoveryStatus());
+    }
+
+    @Test
+    void testGetMissionProgress_SyncsWithTemporalWorkflow() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        when(workflowClient.newWorkflowStub(eq(DroneMissionWorkflow.class), eq("mission-m-1")))
+                .thenReturn(droneMissionWorkflow);
+
+        com.aerosaga.backend.workflow.MissionProgress workflowProgress =
+                new com.aerosaga.backend.workflow.MissionProgress(
+                        "m-1", "DR-01", MissionStatus.RETURNING_TO_BASE, "Returning to base", 90.0, "RETURNING_TO_BASE");
+        when(droneMissionWorkflow.getMissionProgress()).thenReturn(workflowProgress);
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission result = missionService.getMissionProgress("m-1");
+
+        assertNotNull(result);
+        assertEquals(MissionStatus.RETURNING_TO_BASE, result.getStatus());
+        assertEquals(90.0, result.getProgress());
+        assertEquals("Returning to base", result.getCurrentStep());
+        assertEquals("RETURNING_TO_BASE", result.getRecoveryStatus());
+    }
+
+    @Test
+    void testGetMissionProgress_FallbackGracefullyWhenTemporalFails() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        when(workflowClient.newWorkflowStub(eq(DroneMissionWorkflow.class), eq("mission-m-1")))
+                .thenThrow(new RuntimeException("Temporal server unreachable"));
+
+        Mission result = missionService.getMissionProgress("m-1");
+
+        assertNotNull(result);
+        assertEquals(MissionStatus.ACTIVE, result.getStatus());
     }
 }

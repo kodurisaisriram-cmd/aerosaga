@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AeroSaga — Live Telemetry Test Client</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 24px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 22px;
+      color: #38bdf8;
+      margin-bottom: 8px;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .status-connected { background: #166534; color: #4ade80; }
+    .status-connecting { background: #854d0e; color: #fde047; }
+    .status-disconnected { background: #991b1b; color: #f87171; }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+    button {
+      background: #0284c7;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #0369a1; }
+    pre {
+      background: #090d16;
+      border: 1px solid #1e293b;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 13px;
+      color: #a5f3fc;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .field {
+      display: inline-block;
+      margin-right: 12px;
+      margin-bottom: 8px;
+    }
+    label {
+      display: block;
+      font-size: 11px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    input {
+      background: #0f172a;
+      border: 1px solid #475569;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🛰️ AeroSaga Real-Time Telemetry Stream Monitor</h1>
+    <div id="statusBadge" class="status-badge status-connecting">WebSocket se connect ho raha he (ws://localhost:8080/ws/telemetry)...</div>
+
+    <div class="card">
+      <h3 style="margin-top:0">1. Telemetry Test Data Bhejein (POST /api/telemetry)</h3>
+      <p style="font-size: 12px; color: #94a3b8; margin-top: -6px;">Aap Postman se bhi bhej sakte hain ya yahan niche button click karke test kar sakte hain:</p>
+      <div>
+        <div class="field">
+          <label>Drone ID</label>
+          <input type="text" id="droneId" value="DR-03" />
+        </div>
+        <div class="field">
+          <label>Mission ID</label>
+          <input type="text" id="missionId" value="ed4a6193-e635-4273-815c-f2a820ff876b" size="38" />
+        </div>
+        <div class="field">
+          <label>Latitude</label>
+          <input type="number" id="lat" value="19.0760" step="0.0001" />
+        </div>
+        <div class="field">
+          <label>Longitude</label>
+          <input type="number" id="lng" value="72.8777" step="0.0001" />
+        </div>
+        <div class="field">
+          <label>Altitude (m)</label>
+          <input type="number" id="alt" value="150.0" />
+        </div>
+        <div class="field">
+          <label>Battery %</label>
+          <input type="number" id="battery" value="72.0" />
+        </div>
+      </div>
+      <button onclick="sendTelemetry()">Send Telemetry Data</button>
+      <span id="postResult" style="margin-left: 12px; font-size: 13px;"></span>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0">2. WebSocket Par Live Telemetry Packets (/topic/telemetry)</h3>
+        <button onclick="clearLog()" style="background:#475569; font-size:12px; padding:4px 10px;">Clear Log</button>
+      </div>
+      <pre id="log">WebSocket par message aane ka intezaar hai...</pre>
+    </div>
+  </div>
+
+  <script>
+    const badge = document.getElementById('statusBadge');
+    const logArea = document.getElementById('log');
+    let messageCount = 0;
+    let ws = null;
+
+    function connectWebSocket() {
+      badge.className = 'status-badge status-connecting';
+      badge.textContent = 'Connecting to ws://localhost:8080/ws/telemetry...';
+
+      ws = new WebSocket('ws://localhost:8080/ws/telemetry');
+
+      ws.onopen = () => {
+        // Send STOMP CONNECT frame
+        const connectFrame = "CONNECT\naccept-version:1.2,1.1,1.0\nheart-beat:10000,10000\n\n\0";
+        ws.send(connectFrame);
+      };
+
+      ws.onmessage = (event) => {
+        const text = event.data;
+
+        if (text.startsWith('CONNECTED')) {
+          badge.className = 'status-badge status-connected';
+          badge.textContent = '✅ CONNECTED! (STOMP WebSocket Active on /topic/telemetry)';
+          // Subscribe to /topic/telemetry
+          const subFrame = "SUBSCRIBE\nid:sub-0\ndestination:/topic/telemetry\n\n\0";
+          ws.send(subFrame);
+        } else if (text.startsWith('MESSAGE')) {
+          messageCount++;
+          const bodyIndex = text.indexOf('\n\n');
+          let jsonBody = text.substring(bodyIndex + 2);
+          const nullIndex = jsonBody.lastIndexOf('\0');
+          if (nullIndex !== -1) {
+            jsonBody = jsonBody.substring(0, nullIndex);
+          }
+          let formattedJson = jsonBody;
+          try {
+            formattedJson = JSON.stringify(JSON.parse(jsonBody), null, 2);
+          } catch(e) {}
+
+          const time = new Date().toLocaleTimeString();
+          if (messageCount === 1) logArea.textContent = '';
+          logArea.textContent = `[${time}] Received Telemetry Message #${messageCount}:\n` + formattedJson + '\n\n' + logArea.textContent;
+        }
+      };
+
+      ws.onclose = () => {
+        badge.className = 'status-badge status-disconnected';
+        badge.textContent = '❌ Disconnected. 3 second me reconnect hoga...';
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = (err) => {
+        console.error('WebSocket Error:', err);
+      };
+    }
+
+    connectWebSocket();
+
+    async function sendTelemetry() {
+      const droneId = document.getElementById('droneId').value;
+      const missionId = document.getElementById('missionId').value;
+      const latitude = parseFloat(document.getElementById('lat').value);
+      const longitude = parseFloat(document.getElementById('lng').value);
+      const altitude = parseFloat(document.getElementById('alt').value);
+      const batteryLevel = parseFloat(document.getElementById('battery').value);
+
+      const postResult = document.getElementById('postResult');
+      postResult.textContent = 'Bhej rahe hain...';
+      postResult.style.color = '#38bdf8';
+
+      try {
+        const res = await fetch('http://localhost:8080/api/telemetry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ droneId, missionId, latitude, longitude, altitude, batteryLevel })
+        });
+        if (res.ok) {
+          const body = await res.json();
+          postResult.textContent = 'Success! HTTP 201 Created (ID: ' + body.id + ')';
+          postResult.style.color = '#4ade80';
+        } else {
+          const text = await res.text();
+          postResult.textContent = 'Failed: ' + text;
+          postResult.style.color = '#f87171';
+        }
+      } catch (err) {
+        postResult.textContent = 'Error: ' + err.message;
+        postResult.style.color = '#f87171';
+      }
+    }
+
+    function clearLog() {
+      messageCount = 0;
+      logArea.textContent = 'Cleared. Waiting for telemetry packets...';
+    }
+  </script>
+</body>
+</html>

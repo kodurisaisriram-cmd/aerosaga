@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,29 +39,77 @@ public class MissionControllerTest {
                 .content("{\"droneId\":\"DR-01\",\"source\":\"A\",\"destination\":\"B\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.missionId").value("m-1"))
-                .andExpect(jsonPath("$.status").value("PENDING"));
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.recoveryStatus").value("NOT_STARTED"));
     }
 
     @Test
-    void testGetMissionStatus_ReturnsStatus() throws Exception {
-        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.IN_PROGRESS, LocalDateTime.now());
+    void testGetAllMissions_ReturnsList() throws Exception {
+        Mission m1 = new Mission("m-1", "DR-01", "A", "B", MissionStatus.PENDING, LocalDateTime.now());
+        when(missionService.getAllMissions()).thenReturn(List.of(m1));
+
+        mockMvc.perform(get("/api/missions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].missionId").value("m-1"));
+    }
+
+    @Test
+    void testGetMissionById_Success() throws Exception {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, LocalDateTime.now());
+        when(missionService.getMissionById("m-1")).thenReturn(mission);
+
+        mockMvc.perform(get("/api/missions/m-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.missionId").value("m-1"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    void testGetMissionById_NotFound() throws Exception {
+        when(missionService.getMissionById("unknown")).thenThrow(new IllegalArgumentException("Mission not found"));
+
+        mockMvc.perform(get("/api/missions/unknown"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void testGetMissionStatus_ReturnsStatusWithRecoveryAndProgress() throws Exception {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, 50.0, "Navigating", "NOT_STARTED", LocalDateTime.now(), LocalDateTime.now());
         when(missionService.getMissionById("m-1")).thenReturn(mission);
 
         mockMvc.perform(get("/api/missions/m-1/status"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.missionId").value("m-1"))
-                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.progress").value(50.0))
+                .andExpect(jsonPath("$.currentStep").value("Navigating"))
+                .andExpect(jsonPath("$.recoveryStatus").value("NOT_STARTED"));
+    }
+
+    @Test
+    void testGetMissionProgress_ReturnsProgressAndRecoveryStatus() throws Exception {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.RETURNING_TO_BASE, 90.0, "Returning to base", "RETURNING_TO_BASE", LocalDateTime.now(), LocalDateTime.now());
+        when(missionService.getMissionProgress("m-1")).thenReturn(mission);
+
+        mockMvc.perform(get("/api/missions/m-1/progress"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.missionId").value("m-1"))
+                .andExpect(jsonPath("$.droneId").value("DR-01"))
+                .andExpect(jsonPath("$.status").value("RETURNING_TO_BASE"))
+                .andExpect(jsonPath("$.progress").value(90.0))
+                .andExpect(jsonPath("$.currentStep").value("Returning to base"))
+                .andExpect(jsonPath("$.recoveryStatus").value("RETURNING_TO_BASE"));
     }
 
     @Test
     void testStartMission_ReturnsOk() throws Exception {
-        Mission started = new Mission("m-1", "DR-01", "A", "B", MissionStatus.IN_PROGRESS, LocalDateTime.now());
+        Mission started = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, LocalDateTime.now());
         when(missionService.startMission("m-1")).thenReturn(started);
 
         mockMvc.perform(post("/api/missions/m-1/start"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.missionId").value("m-1"))
-                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
 
     @Test
@@ -78,4 +127,30 @@ public class MissionControllerTest {
         mockMvc.perform(post("/api/missions/m-1/start"))
                 .andExpect(status().isConflict());
     }
+
+    @Test
+    void testUpdateMissionStatus_ReturnsOk() throws Exception {
+        Mission updated = new Mission("m-1", "DR-01", "A", "B", MissionStatus.RETURNING_TO_BASE, 90.0, "Returning to base", "RETURNING_TO_BASE", LocalDateTime.now(), LocalDateTime.now());
+        when(missionService.updateMissionStatus("m-1", MissionStatus.RETURNING_TO_BASE)).thenReturn(updated);
+
+        mockMvc.perform(patch("/api/missions/m-1/status?status=RETURNING_TO_BASE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RETURNING_TO_BASE"))
+                .andExpect(jsonPath("$.recoveryStatus").value("RETURNING_TO_BASE"));
+    }
+
+    @Test
+    void testUpdateMissionProgress_ReturnsOk() throws Exception {
+        Mission updated = new Mission("m-1", "DR-01", "A", "B", MissionStatus.RETURNING_TO_BASE, 90.0, "Returning to base", "RETURNING_TO_BASE", LocalDateTime.now(), LocalDateTime.now());
+        when(missionService.updateMissionProgress(eq("m-1"), eq(90.0), eq("Returning to base"), eq("RETURNING_TO_BASE"))).thenReturn(updated);
+
+        mockMvc.perform(patch("/api/missions/m-1/progress")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"progress\":90.0,\"currentStep\":\"Returning to base\",\"recoveryStatus\":\"RETURNING_TO_BASE\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.progress").value(90.0))
+                .andExpect(jsonPath("$.currentStep").value("Returning to base"))
+                .andExpect(jsonPath("$.recoveryStatus").value("RETURNING_TO_BASE"));
+    }
 }
+

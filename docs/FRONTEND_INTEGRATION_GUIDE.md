@@ -28,6 +28,17 @@ This document specifies the integration contract between the **AeroSaga Backend*
 
 Base URL: `http://localhost:8080/api/missions`
 
+### 2.0 Mission Workflow States & Lifecycle
+
+| Status | Description | Recovery Status | Progress Typical % |
+| :--- | :--- | :--- | :--- |
+| `PENDING` | Created and ready for launch | `NOT_STARTED` | 0.0% |
+| `ACTIVE` | Drone has launched and is en route / performing task | `NOT_STARTED` | 10.0% – 75.0% |
+| `RETURNING_TO_BASE` | Delivery complete, drone returning to base (recovery phase) | `RETURNING_TO_BASE` | 85.0% – 95.0% |
+| `COMPLETED` | Drone landed safely at base, mission finished | `COMPLETED` | 100.0% |
+| `FAILED` | Mission failed or emergency abort triggered | `FAILED` | N/A |
+| `ABORTED` | Mission manually aborted | `ABORTED` | N/A |
+
 ### 2.1 Create Mission
 - **Endpoint**: `POST /api/missions`
 - **Request Headers**: `Content-Type: application/json`
@@ -47,13 +58,17 @@ Base URL: `http://localhost:8080/api/missions`
     "source": "Warehouse-Alpha",
     "destination": "Hospital-North",
     "status": "PENDING",
-    "createdAt": "2026-10-20T16:00:00"
+    "progress": 0.0,
+    "currentStep": "Pending",
+    "recoveryStatus": "NOT_STARTED",
+    "createdAt": "2026-10-31T12:00:00",
+    "updatedAt": "2026-10-31T12:00:00"
   }
   ```
 
 ### 2.2 Start Mission
 - **Endpoint**: `POST /api/missions/{missionId}/start`
-- **Description**: Validates that the mission is in `PENDING` status, triggers the Temporal workflow execution, and marks the mission as `IN_PROGRESS`.
+- **Description**: Validates that the mission is in `PENDING` status, triggers the Temporal workflow execution, and marks the mission as `ACTIVE`.
 - **Response**: `200 OK`
   ```json
   {
@@ -61,28 +76,73 @@ Base URL: `http://localhost:8080/api/missions`
     "droneId": "DR-02",
     "source": "Warehouse-Alpha",
     "destination": "Hospital-North",
-    "status": "IN_PROGRESS",
-    "createdAt": "2026-10-20T16:00:00"
+    "status": "ACTIVE",
+    "progress": 10.0,
+    "currentStep": "Taking off",
+    "recoveryStatus": "NOT_STARTED",
+    "createdAt": "2026-10-31T12:00:00",
+    "updatedAt": "2026-10-31T12:00:05"
   }
   ```
 - **Error Codes**:
   - `404 Not Found`: If `missionId` does not exist.
   - `409 Conflict`: If the mission is not in `PENDING` state (e.g. already running or completed).
 
-### 2.3 Retrieve Mission Status
+### 2.3 Retrieve Mission Status & Recovery Status
 - **Endpoint**: `GET /api/missions/{missionId}/status`
-- **Description**: Dedicated endpoint to fetch lightweight mission status.
+- **Description**: Lightweight endpoint returning current mission status, recovery phase, progress percentage, and current step.
 - **Response**: `200 OK`
   ```json
   {
     "missionId": "ad3e4b49-caa7-4081-8da9-49da09c09b7b",
-    "status": "IN_PROGRESS"
+    "status": "RETURNING_TO_BASE",
+    "recoveryStatus": "RETURNING_TO_BASE",
+    "progress": 90.0,
+    "currentStep": "Returning to base",
+    "updatedAt": "2026-10-31T12:08:30"
   }
   ```
 
-### 2.4 Get Full Mission Details
+### 2.4 Dedicated Mission Progress & Recovery Query
+- **Endpoint**: `GET /api/missions/{missionId}/progress`
+- **Description**: Returns live progress synced with Member 2's Temporal workflow queries.
+- **Response**: `200 OK`
+  ```json
+  {
+    "missionId": "ad3e4b49-caa7-4081-8da9-49da09c09b7b",
+    "droneId": "DR-02",
+    "status": "RETURNING_TO_BASE",
+    "progress": 90.0,
+    "currentStep": "Returning to base",
+    "recoveryStatus": "RETURNING_TO_BASE",
+    "updatedAt": "2026-10-31T12:08:30"
+  }
+  ```
+
+### 2.5 Update Mission Status
+- **Endpoint**: `PATCH /api/missions/{missionId}/status?status=RETURNING_TO_BASE`
+- **Description**: Update lifecycle status (also accepts JSON body `{"status": "RETURNING_TO_BASE"}`). Automatically adjusts `recoveryStatus` and `progress`.
+- **Response**: `200 OK` (Full `Mission` entity)
+
+### 2.6 Update Mission Progress
+- **Endpoint**: `PATCH /api/missions/{missionId}/progress`
+- **Request Body**:
+  ```json
+  {
+    "progress": 95.0,
+    "currentStep": "Final approach to base",
+    "recoveryStatus": "RETURNING_TO_BASE"
+  }
+  ```
+- **Response**: `200 OK` (Full `Mission` entity)
+
+### 2.7 Get Full Mission Details
 - **Endpoint**: `GET /api/missions/{missionId}`
 - **Response**: `200 OK` (Full `Mission` entity)
+
+### 2.8 Get All Missions
+- **Endpoint**: `GET /api/missions`
+- **Response**: `200 OK` (List of `Mission` entities)
 
 ---
 

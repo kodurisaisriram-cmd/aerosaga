@@ -1,0 +1,72 @@
+### AeroSaga Mission Control & Telemetry REST API
+### Use with VS Code REST Client extension (humao.rest-client)
+
+@baseUrl = http://localhost:8080/api
+@missionId =
+
+### 1. Create a New Mission
+# @name createMission
+POST {{baseUrl}}/missions
+Content-Type: application/json
+
+{
+  "droneId": "DR-02",
+  "source": "Warehouse-Alpha",
+  "destination": "Hospital-North"
+}
+
+### 2. Get All Missions
+GET {{baseUrl}}/missions
+Accept: application/json
+
+### 3. Start Mission
+# Initiates Temporal workflow and transitions mission to ACTIVE
+POST {{baseUrl}}/missions/{{createMission.response.body.missionId}}/start
+Accept: application/json
+
+### 4. Get Mission Details by ID
+GET {{baseUrl}}/missions/{{createMission.response.body.missionId}}
+Accept: application/json
+
+### 5. Get Mission Status & Recovery Status
+GET {{baseUrl}}/missions/{{createMission.response.body.missionId}}/status
+Accept: application/json
+
+### 6. Get Dedicated Mission Progress & Recovery Status
+GET {{baseUrl}}/missions/{{createMission.response.body.missionId}}/progress
+Accept: application/json
+
+### 7. Update Mission Status (Drone Entering Recovery Phase)
+PATCH {{baseUrl}}/missions/{{createMission.response.body.missionId}}/status?status=RETURNING_TO_BASE
+Accept: application/json
+
+### 8. Update Mission Progress & Recovery Step
+PATCH {{baseUrl}}/missions/{{createMission.response.body.missionId}}/progress
+Content-Type: application/json
+
+{
+  "progress": 95.0,
+  "currentStep": "Final approach to base",
+  "recoveryStatus": "RETURNING_TO_BASE"
+}
+
+### 9. Complete Mission & Recovery
+PATCH {{baseUrl}}/missions/{{createMission.response.body.missionId}}/status?status=COMPLETED
+Accept: application/json
+
+### 10. Ingest Drone Telemetry
+POST {{baseUrl}}/telemetry
+Content-Type: application/json
+
+{
+  "droneId": "DR-02",
+  "missionId": "{{createMission.response.body.missionId}}",
+  "latitude": 19.0760,
+  "longitude": 72.8777,
+  "altitude": 120.0,
+  "batteryLevel": 85.5
+}
+
+### 11. Get Latest Drone Telemetry
+GET {{baseUrl}}/telemetry/drone/DR-02/latest
+Accept: application/json

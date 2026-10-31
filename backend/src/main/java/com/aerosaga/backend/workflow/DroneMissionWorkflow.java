@@ -19,3 +19,4 @@ public interface DroneMissionWorkflow {
     @QueryMethod
     MissionProgress getMissionProgress();
 }
+
