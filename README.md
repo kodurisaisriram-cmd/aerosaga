@@ -85,17 +85,54 @@ Ensure the required services, including Temporal and PostgreSQL, are running and
 - Test the mission APIs and telemetry integration.
 - Confirm that workflow progress and status are reported as expected.
 
+## Setup and Build
+
+Run Docker services from the project root:
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+Build the backend from the `backend` directory:
+
+```bash
+mvn clean test
+```
+
+To run the Spring Boot backend:
+
+```bash
+mvn spring-boot:run
+```
+
+To run the frontend, open a separate terminal in the `frontend` directory:
+
+```bash
+npm install
+npm run dev
+```
+
+Ensure the required services, including Temporal and PostgreSQL, are running and correctly configured before testing mission execution.
+
 ## Team Collaboration
 
 AeroSaga is a collaborative team project. The backend workflow, mission APIs, telemetry, and frontend are integrated through shared Git branches and reviewed changes.
 
 ## Team members responsibility
+- Verify that the Maven build and tests complete successfully.
+- Confirm that the Docker services are running.
+- Check that the Temporal server is accessible.
+- Verify that the worker starts without configuration errors.
+- Test the mission APIs and telemetry integration.
+- Confirm that workflow progress and status are reported as expected.
 
 In our team, 4 members are there.
 
 1. Sai Sriram - Github and Project integration.
 
 Responsibility - Repository management, project coordination and integration.
+AeroSaga is a collaborative team project. The backend workflow, mission APIs, telemetry, and frontend are integrated through shared Git branches and reviewed changes.
 
 2. Aakash Verma - Mission Orchestration
 
