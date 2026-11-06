@@ -25,14 +25,19 @@ public class MissionController {
 
     // Create a new mission
     @PostMapping
-    public ResponseEntity<Mission> createMission(
+    public ResponseEntity<?> createMission(
             @RequestBody Mission mission) {
 
-        Mission createdMission =
-                missionService.createMission(mission);
+        try {
+            Mission createdMission =
+                    missionService.createMission(mission);
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(createdMission);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(createdMission);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest()
+                    .body(ex.getMessage());
+        }
     }
 
     // Get all missions
@@ -183,7 +188,7 @@ public ResponseEntity<?> updateMissionStatus(
 
     // Start a mission
     @PostMapping("/{missionId}/start")
-    public ResponseEntity<Mission> startMission(
+    public ResponseEntity<?> startMission(
             @PathVariable String missionId) {
 
         try {
@@ -191,11 +196,42 @@ public ResponseEntity<?> updateMissionStatus(
             return ResponseEntity.ok(mission);
 
         } catch (IllegalArgumentException ex) {
-            return ResponseEntity.notFound().build();
+            if ("Mission ID is required".equalsIgnoreCase(ex.getMessage())
+                    || ex.getMessage().contains("required")) {
+                return ResponseEntity.badRequest().body(ex.getMessage());
+            }
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
 
         } catch (IllegalStateException ex) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+        }
+    }
+
+    // Emergency abort mission
+    @PostMapping("/{missionId}/abort")
+    public ResponseEntity<?> abortMission(
+            @PathVariable String missionId,
+            @RequestBody(required = false) Map<String, Object> body) {
+
+        try {
+            String reason = null;
+            if (body != null && body.containsKey("reason") && body.get("reason") != null) {
+                reason = body.get("reason").toString();
+            }
+
+            Mission abortedMission = missionService.abortMission(missionId, reason);
+            return ResponseEntity.ok(abortedMission);
+
+        } catch (IllegalArgumentException ex) {
+            if ("Mission ID is required".equalsIgnoreCase(ex.getMessage())) {
+                return ResponseEntity.badRequest().body(ex.getMessage());
+            }
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
         }
     }
 }
+
 

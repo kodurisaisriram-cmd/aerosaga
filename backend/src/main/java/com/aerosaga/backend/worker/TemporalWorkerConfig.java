@@ -8,6 +8,7 @@ import io.temporal.client.WorkflowClient;
 import io.temporal.serviceclient.WorkflowServiceStubs;
 import io.temporal.worker.Worker;
 import io.temporal.worker.WorkerFactory;
+import io.temporal.worker.WorkflowImplementationOptions;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,7 +35,12 @@ public class TemporalWorkerConfig {
         WorkerFactory factory = WorkerFactory.newInstance(client);
         Worker worker = factory.newWorker(TASK_QUEUE);
 
+        WorkflowImplementationOptions options = WorkflowImplementationOptions.newBuilder()
+                .setFailWorkflowExceptionTypes(IllegalArgumentException.class)
+                .build();
+
         worker.registerWorkflowImplementationTypes(
+                options,
                 DroneMissionWorkflowImpl.class);
 
         worker.registerActivitiesImplementations(

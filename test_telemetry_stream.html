@@ -119,6 +119,27 @@
       <span id="postResult" style="margin-left: 12px; font-size: 13px;"></span>
     </div>
 
+    <div class="card" style="border-left: 4px solid #ef4444;">
+      <h3 style="margin-top:0; color:#f87171;">3. 🚨 Week 4 — Emergency Abort Test (POST /api/missions/{missionId}/abort)</h3>
+      <p style="font-size: 12px; color: #94a3b8; margin-top: -6px;">Active mission par emergency signal bhej kar abort test karein:</p>
+      <div>
+        <div class="field">
+          <label>Target Mission ID</label>
+          <input type="text" id="abortMissionId" value="ed4a6193-e635-4273-815c-f2a820ff876b" size="38" />
+        </div>
+        <div class="field">
+          <label>Abort Reason</label>
+          <input type="text" id="abortReason" value="Operator Emergency Stop / Weather Hazard" size="38" />
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <button onclick="createAndStartNewMission()" style="background:#059669; margin-right:8px;">+ Nayi Mission Banayein & Start Karein</button>
+        <button onclick="sendEmergencyAbort()" style="background:#dc2626; margin-right:8px;">🚨 Trigger Emergency Abort</button>
+        <button onclick="checkMissionStatus()" style="background:#475569;">🔍 Status Check</button>
+      </div>
+      <pre id="abortResult" style="display:none; margin-top: 12px; max-height: 200px;"></pre>
+    </div>
+
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <h3 style="margin:0">2. WebSocket Par Live Telemetry Packets (/topic/telemetry)</h3>
@@ -127,6 +148,7 @@
       <pre id="log">WebSocket par message aane ka intezaar hai...</pre>
     </div>
   </div>
+
 
   <script>
     const badge = document.getElementById('statusBadge');
@@ -217,6 +239,73 @@
       } catch (err) {
         postResult.textContent = 'Error: ' + err.message;
         postResult.style.color = '#f87171';
+      }
+    }
+
+    async function createAndStartNewMission() {
+      const abortResult = document.getElementById('abortResult');
+      abortResult.style.display = 'block';
+      abortResult.textContent = '1. Nayi mission create ho rahi hai...';
+      try {
+        const createRes = await fetch('http://localhost:8080/api/missions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ droneId: 'DR-03', source: 'Warehouse-Alpha', destination: 'Hospital-North' })
+        });
+        const created = await createRes.json();
+        document.getElementById('abortMissionId').value = created.missionId;
+        abortResult.textContent = 'Mission Created: ' + created.missionId + '\n2. Start ki jaa rahi hai...';
+
+        const startRes = await fetch(`http://localhost:8080/api/missions/${created.missionId}/start`, { method: 'POST' });
+        const started = await startRes.json();
+        abortResult.textContent = '✅ Mission Started Successfully!\n' + JSON.stringify(started, null, 2) + '\n\nAb "Trigger Emergency Abort" button click karke test karein!';
+      } catch (err) {
+        abortResult.textContent = 'Error: ' + err.message;
+      }
+    }
+
+    async function sendEmergencyAbort() {
+      const missionId = document.getElementById('abortMissionId').value.trim();
+      const reason = document.getElementById('abortReason').value.trim();
+      const abortResult = document.getElementById('abortResult');
+      abortResult.style.display = 'block';
+      abortResult.textContent = 'Emergency Abort Signal bhej rahe hain (POST /api/missions/' + missionId + '/abort)...';
+
+      try {
+        const res = await fetch(`http://localhost:8080/api/missions/${missionId}/abort`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason })
+        });
+        const status = res.status;
+        const text = await res.text();
+        let formatted = text;
+        try { formatted = JSON.stringify(JSON.parse(text), null, 2); } catch(e) {}
+
+        if (res.ok) {
+          abortResult.textContent = `✅ [HTTP ${status} OK] Emergency Abort Successful!\n` + formatted;
+        } else {
+          abortResult.textContent = `❌ [HTTP ${status}] Abort Failed:\n` + formatted;
+        }
+      } catch (err) {
+        abortResult.textContent = 'Network Error: ' + err.message;
+      }
+    }
+
+    async function checkMissionStatus() {
+      const missionId = document.getElementById('abortMissionId').value.trim();
+      const abortResult = document.getElementById('abortResult');
+      abortResult.style.display = 'block';
+      abortResult.textContent = 'Status fetch kar rahe hain...';
+      try {
+        const res = await fetch(`http://localhost:8080/api/missions/${missionId}/status`);
+        const status = res.status;
+        const text = await res.text();
+        let formatted = text;
+        try { formatted = JSON.stringify(JSON.parse(text), null, 2); } catch(e) {}
+        abortResult.textContent = `[HTTP ${status}]\n` + formatted;
+      } catch (err) {
+        abortResult.textContent = 'Error: ' + err.message;
       }
     }
 

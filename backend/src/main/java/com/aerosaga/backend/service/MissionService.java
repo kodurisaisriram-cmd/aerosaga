@@ -27,5 +27,9 @@ public interface MissionService {
             String recoveryStatus);
 
     Mission startMission(String missionId);
+
+    Mission abortMission(String missionId);
+
+    Mission abortMission(String missionId, String reason);
 }
 

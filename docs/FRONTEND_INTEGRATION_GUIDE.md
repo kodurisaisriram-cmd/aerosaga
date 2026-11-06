@@ -144,6 +144,36 @@ Base URL: `http://localhost:8080/api/missions`
 - **Endpoint**: `GET /api/missions`
 - **Response**: `200 OK` (List of `Mission` entities)
 
+### 2.9 Emergency Abort Mission (Week 4 Feature)
+- **Endpoint**: `POST /api/missions/{missionId}/abort`
+- **Description**: Triggers an emergency stop/abort on an active drone mission. Sends an asynchronous signal to the running Temporal workflow (`mission-{missionId}`), halting forward flight operations and triggering the drone's safe return-to-base activity. Updates the mission status in PostgreSQL to `ABORTED`.
+- **Request Headers**: `Content-Type: application/json`
+- **Request Body (Optional)**:
+  ```json
+  {
+    "reason": "Severe storm approaching flight corridor"
+  }
+  ```
+- **Response**: `200 OK` (Full `Mission` entity)
+  ```json
+  {
+    "missionId": "ad3e4b49-caa7-4081-8da9-49da09c09b7b",
+    "droneId": "DR-02",
+    "source": "Warehouse-Alpha",
+    "destination": "Hospital-North",
+    "status": "ABORTED",
+    "progress": 50.0,
+    "currentStep": "Aborted: Severe storm approaching flight corridor",
+    "recoveryStatus": "ABORTED",
+    "createdAt": "2026-10-31T12:00:00",
+    "updatedAt": "2026-11-03T15:30:00"
+  }
+  ```
+- **Error Codes**:
+  - `400 Bad Request`: If `missionId` is blank or invalid.
+  - `404 Not Found`: If `missionId` does not exist in the database.
+  - `409 Conflict`: If the mission is not active (e.g. already `COMPLETED`, already `ABORTED`, `FAILED`, or still `PENDING`).
+
 ---
 
 ## 3. Telemetry REST APIs

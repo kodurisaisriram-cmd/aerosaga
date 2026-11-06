@@ -63,8 +63,19 @@ public class MissionServiceTest {
     void testCreateMission_MissingDroneId_ThrowsException() {
         Mission input = new Mission();
         input.setDroneId(null);
+        input.setDestination("Delivery-B");
 
         assertThrows(IllegalArgumentException.class, () -> missionService.createMission(input));
+    }
+
+    @Test
+    void testCreateMission_MissingDestination_ThrowsException() {
+        Mission input = new Mission();
+        input.setDroneId("DR-01");
+        input.setDestination(null);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> missionService.createMission(input));
+        assertEquals("Destination is required", ex.getMessage());
     }
 
     @Test
@@ -109,6 +120,30 @@ public class MissionServiceTest {
         when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
 
         assertThrows(IllegalStateException.class, () -> missionService.startMission("m-1"));
+    }
+
+    @Test
+    void testStartMission_BlankMissionId_ThrowsException() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> missionService.startMission("   "));
+        assertEquals("Mission ID is required", ex.getMessage());
+    }
+
+    @Test
+    void testStartMission_MissingDroneId_ThrowsException() {
+        Mission mission = new Mission("m-1", null, "A", "B", MissionStatus.PENDING, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> missionService.startMission("m-1"));
+        assertEquals("Drone ID is required to start mission", ex.getMessage());
+    }
+
+    @Test
+    void testStartMission_MissingDestination_ThrowsException() {
+        Mission mission = new Mission("m-1", "DR-01", "A", null, MissionStatus.PENDING, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> missionService.startMission("m-1"));
+        assertEquals("Destination is required to start mission", ex.getMessage());
     }
 
     @Test
@@ -187,5 +222,93 @@ public class MissionServiceTest {
 
         assertNotNull(result);
         assertEquals(MissionStatus.ACTIVE, result.getStatus());
+    }
+
+    @Test
+    void testAbortMission_Success_ActiveMission() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(workflowClient.newWorkflowStub(eq(DroneMissionWorkflow.class), eq("mission-m-1")))
+                .thenReturn(droneMissionWorkflow);
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission aborted = missionService.abortMission("m-1");
+
+        assertNotNull(aborted);
+        assertEquals(MissionStatus.ABORTED, aborted.getStatus());
+        assertEquals("ABORTED", aborted.getRecoveryStatus());
+        assertEquals("Emergency abort - stopping mission", aborted.getCurrentStep());
+        verify(droneMissionWorkflow).requestEmergencyAbort();
+        verify(missionRepository).save(mission);
+    }
+
+    @Test
+    void testAbortMission_WithReason_Success() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(workflowClient.newWorkflowStub(eq(DroneMissionWorkflow.class), eq("mission-m-1")))
+                .thenReturn(droneMissionWorkflow);
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission aborted = missionService.abortMission("m-1", "Adverse weather conditions");
+
+        assertEquals(MissionStatus.ABORTED, aborted.getStatus());
+        assertEquals("ABORTED", aborted.getRecoveryStatus());
+        assertEquals("Aborted: Adverse weather conditions", aborted.getCurrentStep());
+        verify(droneMissionWorkflow).requestEmergencyAbort();
+    }
+
+    @Test
+    void testAbortMission_WorkflowThrowsException_StillAbortsGracefully() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(workflowClient.newWorkflowStub(eq(DroneMissionWorkflow.class), eq("mission-m-1")))
+                .thenThrow(new RuntimeException("Temporal server unreachable"));
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission aborted = missionService.abortMission("m-1");
+
+        assertNotNull(aborted);
+        assertEquals(MissionStatus.ABORTED, aborted.getStatus());
+        verify(missionRepository).save(mission);
+    }
+
+    @Test
+    void testAbortMission_NotFound_ThrowsException() {
+        when(missionRepository.findById("m-unknown")).thenReturn(Optional.empty());
+
+        assertThrows(IllegalArgumentException.class, () -> missionService.abortMission("m-unknown"));
+    }
+
+    @Test
+    void testAbortMission_Pending_ThrowsException() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.PENDING, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        assertThrows(IllegalStateException.class, () -> missionService.abortMission("m-1"));
+    }
+
+    @Test
+    void testAbortMission_Completed_ThrowsException() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.COMPLETED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        assertThrows(IllegalStateException.class, () -> missionService.abortMission("m-1"));
+    }
+
+    @Test
+    void testAbortMission_AlreadyAborted_ThrowsException() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ABORTED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        assertThrows(IllegalStateException.class, () -> missionService.abortMission("m-1"));
+    }
+
+    @Test
+    void testAbortMission_Failed_ThrowsException() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.FAILED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        assertThrows(IllegalStateException.class, () -> missionService.abortMission("m-1"));
     }
 }

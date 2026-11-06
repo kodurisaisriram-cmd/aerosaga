@@ -11,6 +11,8 @@ public enum MissionStatus {
     RETURNING_TO_BASE,
     COMPLETED,
     FAILED,
+    ABORT_REQUESTED,
+    ABORTING,
     ABORTED;
 
     @JsonCreator

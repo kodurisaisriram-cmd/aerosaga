@@ -54,7 +54,16 @@ Content-Type: application/json
 PATCH {{baseUrl}}/missions/{{createMission.response.body.missionId}}/status?status=COMPLETED
 Accept: application/json
 
-### 10. Ingest Drone Telemetry
+### 10. Emergency Abort Mission
+POST {{baseUrl}}/missions/{{createMission.response.body.missionId}}/abort
+Content-Type: application/json
+
+{
+  "reason": "Severe weather alert / Operator emergency stop"
+}
+
+
+### 11. Ingest Drone Telemetry
 POST {{baseUrl}}/telemetry
 Content-Type: application/json
 
@@ -67,6 +76,6 @@ Content-Type: application/json
   "batteryLevel": 85.5
 }
 
-### 11. Get Latest Drone Telemetry
+### 12. Get Latest Drone Telemetry
 GET {{baseUrl}}/telemetry/drone/DR-02/latest
 Accept: application/json

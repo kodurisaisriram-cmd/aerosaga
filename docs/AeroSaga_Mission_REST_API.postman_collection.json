@@ -228,6 +228,126 @@
           ]
         }
       }
+    },
+    {
+      "name": "10. Emergency Abort Mission",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Mission status is ABORTED', function () {",
+              "    pm.expect(jsonData.status).to.eql('ABORTED');",
+              "    pm.expect(jsonData.recoveryStatus).to.eql('ABORTED');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Severe weather warning / Operator triggered abort\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/missions/{{missionId}}/abort",
+          "host": ["{{baseUrl}}"],
+          "path": ["missions", "{{missionId}}", "abort"]
+        }
+      }
+    },
+    {
+      "name": "11. Ingest Drone Telemetry",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Telemetry persisted with ID', function () {",
+              "    pm.expect(jsonData.id).to.not.be.null;",
+              "    pm.expect(jsonData.droneId).to.eql('DR-02');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"droneId\": \"DR-02\",\n  \"missionId\": \"{{missionId}}\",\n  \"latitude\": 19.0760,\n  \"longitude\": 72.8777,\n  \"altitude\": 120.0,\n  \"batteryLevel\": 85.5\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/telemetry",
+          "host": ["{{baseUrl}}"],
+          "path": ["telemetry"]
+        }
+      }
+    },
+    {
+      "name": "12. Get Latest Drone Telemetry",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Returned latest telemetry for drone', function () {",
+              "    pm.expect(jsonData.droneId).to.eql('DR-02');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/telemetry/drone/DR-02/latest",
+          "host": ["{{baseUrl}}"],
+          "path": ["telemetry", "drone", "DR-02", "latest"]
+        }
+      }
     }
   ]
 }

@@ -52,6 +52,12 @@ public class MissionServiceImpl implements MissionService {
                     "Drone ID is required");
         }
 
+        if (mission.getDestination() == null
+                || mission.getDestination().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Destination is required");
+        }
+
         LocalDateTime now = LocalDateTime.now();
         mission.setMissionId(UUID.randomUUID().toString());
         mission.setStatus(MissionStatus.PENDING);
@@ -90,7 +96,9 @@ public class MissionServiceImpl implements MissionService {
         // Coordinate with Member 2's Temporal workflow when active or in recovery
         if (mission.getStatus() == MissionStatus.ACTIVE
                 || mission.getStatus() == MissionStatus.IN_PROGRESS
-                || mission.getStatus() == MissionStatus.RETURNING_TO_BASE) {
+                || mission.getStatus() == MissionStatus.RETURNING_TO_BASE
+                || mission.getStatus() == MissionStatus.ABORT_REQUESTED
+                || mission.getStatus() == MissionStatus.ABORTING) {
             try {
                 DroneMissionWorkflow workflowStub = workflowClient.newWorkflowStub(
                         DroneMissionWorkflow.class,
@@ -233,6 +241,11 @@ public Mission updateMissionProgress(
     @Transactional
     public Mission startMission(String missionId) {
 
+        if (missionId == null || missionId.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Mission ID is required");
+        }
+
         Mission mission = missionRepository.findById(missionId)
                 .orElseThrow(() ->
                         new IllegalArgumentException(
@@ -242,6 +255,16 @@ public Mission updateMissionProgress(
             throw new IllegalStateException(
                     "Only PENDING missions can be started. "
                     + "Current status: " + mission.getStatus());
+        }
+
+        if (mission.getDroneId() == null || mission.getDroneId().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Drone ID is required to start mission");
+        }
+
+        if (mission.getDestination() == null || mission.getDestination().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Destination is required to start mission");
         }
 
         DroneMissionWorkflow workflow =
@@ -264,11 +287,66 @@ WorkflowClient.start(
         List.of(request)
 );
 
-mission.setStatus(MissionStatus.ACTIVE);
-mission.setCurrentStep("Taking off");
-mission.setProgress(10.0);
-mission.setRecoveryStatus("NOT_STARTED");
-mission.setUpdatedAt(LocalDateTime.now());
+        mission.setStatus(MissionStatus.ACTIVE);
+        mission.setCurrentStep("Taking off");
+        mission.setProgress(10.0);
+        mission.setRecoveryStatus("NOT_STARTED");
+        mission.setUpdatedAt(LocalDateTime.now());
+        return missionRepository.save(mission);
+    }
+
+    @Override
+    public Mission abortMission(String missionId) {
+        return abortMission(missionId, null);
+    }
+
+    @Override
+    @Transactional
+    public Mission abortMission(String missionId, String reason) {
+        if (missionId == null || missionId.isBlank()) {
+            throw new IllegalArgumentException("Mission ID is required");
+        }
+
+        Mission mission = missionRepository.findById(missionId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Mission not found: " + missionId));
+
+        if (mission.getStatus() == MissionStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot abort a completed mission");
+        }
+
+        if (mission.getStatus() == MissionStatus.ABORTED) {
+            throw new IllegalStateException("Mission is already aborted");
+        }
+
+        if (mission.getStatus() == MissionStatus.PENDING) {
+            throw new IllegalStateException(
+                    "Cannot abort a mission that has not been started. Current status: PENDING");
+        }
+
+        if (mission.getStatus() == MissionStatus.FAILED) {
+            throw new IllegalStateException("Cannot abort a failed mission");
+        }
+
+        // Send Emergency Abort signal to running Temporal workflow
+        try {
+            DroneMissionWorkflow workflowStub = workflowClient.newWorkflowStub(
+                    DroneMissionWorkflow.class,
+                    "mission-" + missionId
+            );
+            workflowStub.requestEmergencyAbort();
+            log.info("Sent emergency abort signal to workflow mission-{}", missionId);
+        } catch (Exception ex) {
+            log.warn("Could not signal workflow for mission {}: {}", missionId, ex.getMessage());
+        }
+
+        mission.setStatus(MissionStatus.ABORTED);
+        mission.setRecoveryStatus("ABORTED");
+        mission.setCurrentStep(reason != null && !reason.isBlank()
+                ? "Aborted: " + reason
+                : "Emergency abort - stopping mission");
+        mission.setUpdatedAt(LocalDateTime.now());
+
         return missionRepository.save(mission);
     }
 }
