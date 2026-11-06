@@ -26,7 +26,12 @@ public class MissionController {
     // Create a new mission
     @PostMapping
     public ResponseEntity<?> createMission(
-            @RequestBody Mission mission) {
+            @RequestBody(required = false) Mission mission) {
+
+        if (mission == null) {
+            return ResponseEntity.badRequest()
+                    .body("Mission payload is required");
+        }
 
         try {
             Mission createdMission =
@@ -48,8 +53,12 @@ public class MissionController {
 
     // Get mission by ID
     @GetMapping("/{missionId}")
-    public ResponseEntity<Mission> getMissionById(
+    public ResponseEntity<?> getMissionById(
             @PathVariable String missionId) {
+
+        if (missionId == null || missionId.isBlank()) {
+            return ResponseEntity.badRequest().body("Mission ID is required");
+        }
 
         try {
             return ResponseEntity.ok(
@@ -60,46 +69,60 @@ public class MissionController {
     }
 
     // Update mission status
+    @PatchMapping("/{missionId}/status")
+    public ResponseEntity<?> updateMissionStatus(
+            @PathVariable String missionId,
+            @RequestParam(required = false) MissionStatus status,
+            @RequestBody(required = false) Map<String, Object> body) {
 
-@PatchMapping("/{missionId}/status")
-public ResponseEntity<?> updateMissionStatus(
-        @PathVariable String missionId,
-        @RequestParam(required = false) MissionStatus status,
-        @RequestBody(required = false) Map<String, Object> body) {
+        if (missionId == null || missionId.isBlank()) {
+            return ResponseEntity.badRequest().body("Mission ID is required");
+        }
 
-    try {
-        MissionStatus targetStatus = status;
+        try {
+            MissionStatus targetStatus = status;
 
-        if (targetStatus == null && body != null && body.containsKey("status")) {
-            try {
-                targetStatus = MissionStatus.fromValue(body.get("status").toString());
-            } catch (IllegalArgumentException ex) {
-                return ResponseEntity.badRequest()
-                        .body("Invalid mission status");
+            if (targetStatus == null && body != null && body.containsKey("status")) {
+                try {
+                    targetStatus = MissionStatus.fromValue(body.get("status").toString());
+                } catch (IllegalArgumentException ex) {
+                    return ResponseEntity.badRequest()
+                            .body("Invalid mission status");
+                }
             }
-        }
 
-        if (targetStatus == null) {
+            if (targetStatus == null) {
+                return ResponseEntity.badRequest()
+                        .body("Mission status is required");
+            }
+
+            Mission mission = missionService.updateMissionStatus(
+                    missionId, targetStatus);
+
+            return ResponseEntity.ok(mission);
+
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ex.getMessage());
+        } catch (IllegalArgumentException ex) {
+            if (ex.getMessage() != null && ex.getMessage().contains("not found")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ex.getMessage());
+            }
             return ResponseEntity.badRequest()
-                    .body("Mission status is required");
+                    .body(ex.getMessage());
         }
-
-        Mission mission = missionService.updateMissionStatus(
-                missionId, targetStatus);
-
-        return ResponseEntity.ok(mission);
-
-    } catch (IllegalArgumentException ex) {
-        return ResponseEntity.badRequest()
-                .body(ex.getMessage());
     }
-}
 
 
     // Get mission status with recovery details and progress
     @GetMapping("/{missionId}/status")
     public ResponseEntity<?> getMissionStatus(
             @PathVariable String missionId) {
+
+        if (missionId == null || missionId.isBlank()) {
+            return ResponseEntity.badRequest().body("Mission ID is required");
+        }
 
         try {
             Mission mission = missionService.getMissionById(missionId);
@@ -125,6 +148,10 @@ public ResponseEntity<?> updateMissionStatus(
     @GetMapping("/{missionId}/progress")
     public ResponseEntity<?> getMissionProgress(
             @PathVariable String missionId) {
+
+        if (missionId == null || missionId.isBlank()) {
+            return ResponseEntity.badRequest().body("Mission ID is required");
+        }
 
         try {
             Mission mission = missionService.getMissionProgress(missionId);
@@ -153,6 +180,10 @@ public ResponseEntity<?> updateMissionStatus(
             @PathVariable String missionId,
             @RequestBody(required = false) Map<String, Object> body) {
 
+        if (missionId == null || missionId.isBlank()) {
+            return ResponseEntity.badRequest().body("Mission ID is required");
+        }
+
         try {
             Double progress = null;
             String currentStep = null;
@@ -160,7 +191,11 @@ public ResponseEntity<?> updateMissionStatus(
 
             if (body != null) {
                 if (body.get("progress") != null) {
-                    progress = Double.valueOf(body.get("progress").toString());
+                    try {
+                        progress = Double.valueOf(body.get("progress").toString());
+                    } catch (NumberFormatException ex) {
+                        return ResponseEntity.badRequest().body("Progress must be between 0 and 100");
+                    }
                 }
                 if (progress != null && (progress < 0 || progress > 100)) {
                     return ResponseEntity.badRequest()
@@ -178,11 +213,14 @@ public ResponseEntity<?> updateMissionStatus(
                     missionId, progress, currentStep, recoveryStatus);
             return ResponseEntity.ok(mission);
         } catch (IllegalStateException ex) {
-        	return ResponseEntity.status(HttpStatus.CONFLICT)
-        	        .body("Cannot update progress of a completed mission");
-       } catch (IllegalArgumentException ex) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(ex.getMessage());
+        } catch (IllegalArgumentException ex) {
+            if (ex.getMessage() != null && ex.getMessage().contains("not found")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(ex.getMessage());
+            }
+            return ResponseEntity.badRequest().body(ex.getMessage());
         }
     }
 
@@ -190,6 +228,10 @@ public ResponseEntity<?> updateMissionStatus(
     @PostMapping("/{missionId}/start")
     public ResponseEntity<?> startMission(
             @PathVariable String missionId) {
+
+        if (missionId == null || missionId.isBlank()) {
+            return ResponseEntity.badRequest().body("Mission ID is required");
+        }
 
         try {
             Mission mission = missionService.startMission(missionId);
@@ -212,6 +254,10 @@ public ResponseEntity<?> updateMissionStatus(
     public ResponseEntity<?> abortMission(
             @PathVariable String missionId,
             @RequestBody(required = false) Map<String, Object> body) {
+
+        if (missionId == null || missionId.isBlank()) {
+            return ResponseEntity.badRequest().body("Mission ID is required");
+        }
 
         try {
             String reason = null;

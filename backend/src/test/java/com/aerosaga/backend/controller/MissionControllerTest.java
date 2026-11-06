@@ -232,6 +232,47 @@ public class MissionControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(content().string("Cannot abort a completed mission"));
     }
+
+    @Test
+    void testUpdateMissionStatus_NotFound_Returns404() throws Exception {
+        when(missionService.updateMissionStatus(eq("m-unknown"), eq(MissionStatus.ACTIVE)))
+                .thenThrow(new IllegalArgumentException("Mission not found: m-unknown"));
+
+        mockMvc.perform(patch("/api/missions/m-unknown/status?status=ACTIVE"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string("Mission not found: m-unknown"));
+    }
+
+    @Test
+    void testUpdateMissionStatus_Conflict_Returns409() throws Exception {
+        when(missionService.updateMissionStatus(eq("m-1"), eq(MissionStatus.ACTIVE)))
+                .thenThrow(new IllegalStateException("Cannot change status of a completed mission"));
+
+        mockMvc.perform(patch("/api/missions/m-1/status?status=ACTIVE"))
+                .andExpect(status().isConflict())
+                .andExpect(content().string("Cannot change status of a completed mission"));
+    }
+
+    @Test
+    void testUpdateMissionProgress_ProgressOutOfBounds_Returns400() throws Exception {
+        mockMvc.perform(patch("/api/missions/m-1/progress")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"progress\":150.0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Progress must be between 0 and 100"));
+    }
+
+    @Test
+    void testUpdateMissionProgress_Conflict_Returns409() throws Exception {
+        when(missionService.updateMissionProgress(eq("m-1"), any(), any(), any()))
+                .thenThrow(new IllegalStateException("Cannot update progress of an aborted mission"));
+
+        mockMvc.perform(patch("/api/missions/m-1/progress")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"progress\":50.0}"))
+                .andExpect(status().isConflict())
+                .andExpect(content().string("Cannot update progress of an aborted mission"));
+    }
 }
 
 

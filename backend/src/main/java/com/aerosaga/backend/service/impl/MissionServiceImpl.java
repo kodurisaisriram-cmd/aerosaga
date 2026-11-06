@@ -77,7 +77,14 @@ public class MissionServiceImpl implements MissionService {
 
     @Override
     public Mission getMissionById(String missionId) {
-        return getMissionProgress(missionId);
+        if (missionId == null || missionId.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Mission ID is required");
+        }
+        return missionRepository.findById(missionId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Mission not found: " + missionId));
     }
 
     @Override
@@ -112,8 +119,12 @@ public class MissionServiceImpl implements MissionService {
                         changed = true;
                     }
                     if (liveProgress.getProgress() != null && !liveProgress.getProgress().equals(mission.getProgress())) {
-                        mission.setProgress(liveProgress.getProgress());
-                        changed = true;
+                        if (mission.getProgress() == null || liveProgress.getProgress() >= mission.getProgress()
+                                || liveProgress.getStatus() == MissionStatus.FAILED
+                                || liveProgress.getStatus() == MissionStatus.ABORTED) {
+                            mission.setProgress(liveProgress.getProgress());
+                            changed = true;
+                        }
                     }
                     if (liveProgress.getCurrentStep() != null && !liveProgress.getCurrentStep().equals(mission.getCurrentStep())) {
                         mission.setCurrentStep(liveProgress.getCurrentStep());
@@ -157,6 +168,8 @@ public class MissionServiceImpl implements MissionService {
                         new IllegalArgumentException(
                                 "Mission not found: " + missionId));
 
+        validateStatusTransition(mission.getStatus(), status);
+
         mission.setStatus(status);
         mission.setUpdatedAt(LocalDateTime.now());
 
@@ -182,6 +195,37 @@ public class MissionServiceImpl implements MissionService {
         return missionRepository.save(mission);
     }
 
+    private void validateStatusTransition(MissionStatus current, MissionStatus target) {
+        if (current == target) {
+            return;
+        }
+
+        if (current == MissionStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot change status of a completed mission");
+        }
+        if (current == MissionStatus.ABORTED) {
+            throw new IllegalStateException("Cannot change status of an aborted mission");
+        }
+        if (current == MissionStatus.FAILED) {
+            throw new IllegalStateException("Cannot change status of a failed mission");
+        }
+
+        if (current == MissionStatus.PENDING) {
+            if (target == MissionStatus.COMPLETED || target == MissionStatus.RETURNING_TO_BASE) {
+                throw new IllegalStateException("Cannot transition PENDING mission directly to " + target);
+            }
+        }
+
+        if (target == MissionStatus.PENDING) {
+            throw new IllegalStateException("Cannot revert an active mission back to PENDING");
+        }
+
+        if (current == MissionStatus.ABORT_REQUESTED || current == MissionStatus.ABORTING) {
+            if (target != MissionStatus.ABORTING && target != MissionStatus.ABORTED && target != MissionStatus.FAILED) {
+                throw new IllegalStateException("Cannot transition aborting mission to " + target);
+            }
+        }
+    }
 
 @Override
 public Mission updateMissionProgress(
@@ -202,10 +246,18 @@ public Mission updateMissionProgress(
                     new IllegalArgumentException(
                             "Mission not found: " + missionId));
 
-    // 3. Prevent updates to completed missions
+    // 3. Prevent updates to completed or terminated missions
     if (mission.getStatus() == MissionStatus.COMPLETED) {
         throw new IllegalStateException(
                 "Cannot update progress of a completed mission");
+    }
+    if (mission.getStatus() == MissionStatus.ABORTED) {
+        throw new IllegalStateException(
+                "Cannot update progress of an aborted mission");
+    }
+    if (mission.getStatus() == MissionStatus.FAILED) {
+        throw new IllegalStateException(
+                "Cannot update progress of a failed mission");
     }
 
     // 4. Validate progress range
@@ -319,6 +371,11 @@ WorkflowClient.start(
             throw new IllegalStateException("Mission is already aborted");
         }
 
+        if (mission.getStatus() == MissionStatus.ABORT_REQUESTED
+                || mission.getStatus() == MissionStatus.ABORTING) {
+            throw new IllegalStateException("Mission abort is already in progress");
+        }
+
         if (mission.getStatus() == MissionStatus.PENDING) {
             throw new IllegalStateException(
                     "Cannot abort a mission that has not been started. Current status: PENDING");
@@ -337,7 +394,8 @@ WorkflowClient.start(
             workflowStub.requestEmergencyAbort();
             log.info("Sent emergency abort signal to workflow mission-{}", missionId);
         } catch (Exception ex) {
-            log.warn("Could not signal workflow for mission {}: {}", missionId, ex.getMessage());
+            log.error("Could not signal workflow for mission {}: {}", missionId, ex.getMessage());
+            throw new IllegalStateException("Failed to abort mission workflow: " + ex.getMessage(), ex);
         }
 
         mission.setStatus(MissionStatus.ABORTED);

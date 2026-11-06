@@ -156,6 +156,12 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             missionStatus = MissionStatus.ABORTED;
             currentStep = "Aborted";
             recoveryStatus = "ABORTED";
+            for (DroneProgress drone : droneProgress.values()) {
+                if (drone.getStatus() != DroneStatus.COMPLETED && drone.getStatus() != DroneStatus.FAILED) {
+                    drone.setStatus(DroneStatus.ABORTED);
+                    drone.setCurrentStep("Aborted");
+                }
+            }
         } else if (allCompleted) {
             missionStatus = MissionStatus.COMPLETED;
             currentStep = "Completed";
@@ -301,19 +307,22 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
         }
 
         if (drone.getStatus() == DroneStatus.COMPLETED
-                || drone.getStatus() == DroneStatus.FAILED) {
+                || drone.getStatus() == DroneStatus.FAILED
+                || drone.getStatus() == DroneStatus.ABORTED) {
             return true;
         }
 
         currentStep = "Emergency abort - stopping mission";
         recoveryStatus = "ABORTED";
         missionStatus = MissionStatus.ABORTED;
-        drone.setCurrentStep("Aborted");
 
         try {
-            if (!"Waiting to start".equals(drone.getCurrentStep())) {
+            if (drone.getStatus() == DroneStatus.RUNNING) {
+                drone.setCurrentStep("Returning to base - aborting");
                 activities.returnToBase(droneId);
             }
+            drone.setStatus(DroneStatus.ABORTED);
+            drone.setCurrentStep("Aborted");
             Workflow.getLogger(DroneMissionWorkflowImpl.class)
                     .warn("Drone {} safely aborted in mission {}",
                             droneId, missionId);

@@ -259,18 +259,16 @@ public class MissionServiceTest {
     }
 
     @Test
-    void testAbortMission_WorkflowThrowsException_StillAbortsGracefully() {
+    void testAbortMission_WorkflowThrowsException_ThrowsIllegalStateException() {
         Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, LocalDateTime.now());
         when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
         when(workflowClient.newWorkflowStub(eq(DroneMissionWorkflow.class), eq("mission-m-1")))
                 .thenThrow(new RuntimeException("Temporal server unreachable"));
-        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Mission aborted = missionService.abortMission("m-1");
-
-        assertNotNull(aborted);
-        assertEquals(MissionStatus.ABORTED, aborted.getStatus());
-        verify(missionRepository).save(mission);
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> missionService.abortMission("m-1"));
+        assertTrue(ex.getMessage().contains("Failed to abort mission workflow"));
+        verify(missionRepository, never()).save(any(Mission.class));
     }
 
     @Test
@@ -305,10 +303,68 @@ public class MissionServiceTest {
     }
 
     @Test
+    void testAbortMission_AlreadyAborting_ThrowsException() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ABORTING, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        assertThrows(IllegalStateException.class, () -> missionService.abortMission("m-1"));
+    }
+
+    @Test
     void testAbortMission_Failed_ThrowsException() {
         Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.FAILED, LocalDateTime.now());
         when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
 
         assertThrows(IllegalStateException.class, () -> missionService.abortMission("m-1"));
+    }
+
+    @Test
+    void testUpdateMissionStatus_CompletedToActive_ThrowsIllegalStateException() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.COMPLETED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> missionService.updateMissionStatus("m-1", MissionStatus.ACTIVE));
+        assertTrue(ex.getMessage().contains("Cannot change status of a completed mission"));
+    }
+
+    @Test
+    void testUpdateMissionStatus_AbortedToActive_ThrowsIllegalStateException() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ABORTED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> missionService.updateMissionStatus("m-1", MissionStatus.ACTIVE));
+        assertTrue(ex.getMessage().contains("Cannot change status of an aborted mission"));
+    }
+
+    @Test
+    void testUpdateMissionStatus_PendingToCompleted_ThrowsIllegalStateException() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.PENDING, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> missionService.updateMissionStatus("m-1", MissionStatus.COMPLETED));
+        assertTrue(ex.getMessage().contains("Cannot transition PENDING mission directly to COMPLETED"));
+    }
+
+    @Test
+    void testUpdateMissionProgress_AbortedMission_ThrowsIllegalStateException() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ABORTED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> missionService.updateMissionProgress("m-1", 50.0, "Flying", "IN_PROGRESS"));
+        assertTrue(ex.getMessage().contains("Cannot update progress of an aborted mission"));
+    }
+
+    @Test
+    void testUpdateMissionProgress_FailedMission_ThrowsIllegalStateException() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.FAILED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> missionService.updateMissionProgress("m-1", 50.0, "Flying", "IN_PROGRESS"));
+        assertTrue(ex.getMessage().contains("Cannot update progress of a failed mission"));
     }
 }
