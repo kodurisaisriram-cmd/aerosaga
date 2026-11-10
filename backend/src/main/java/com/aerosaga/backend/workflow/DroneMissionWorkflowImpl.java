@@ -292,9 +292,12 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
     public void requestEmergencyAbort() {
         if (!emergencyAbortRequested) {
             emergencyAbortRequested = true;
-            this.missionStatus = MissionStatus.ABORTED;
-            this.currentStep = "Emergency abort - stopping mission";
-            this.recoveryStatus = "ABORTED";
+            // Set ABORT_REQUESTED to signal intent; the actual ABORTING/ABORTED
+            // transitions happen inside stopForEmergencyAbort() as each drone
+            // completes its safe-return/abort procedure.
+            this.missionStatus = MissionStatus.ABORT_REQUESTED;
+            this.currentStep = "Emergency abort requested - stopping mission";
+            this.recoveryStatus = "ABORT_REQUESTED";
 
             Workflow.getLogger(DroneMissionWorkflowImpl.class)
                     .warn("Emergency abort requested for mission {}", missionId);
@@ -312,9 +315,10 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             return true;
         }
 
-        currentStep = "Emergency abort - stopping mission";
-        recoveryStatus = "ABORTED";
-        missionStatus = MissionStatus.ABORTED;
+        // Transition to ABORTING while safe-return/abort is in progress
+        currentStep = "Aborting - returning drone to base";
+        recoveryStatus = "ABORTING";
+        missionStatus = MissionStatus.ABORTING;
 
         try {
             if (drone.getStatus() == DroneStatus.RUNNING) {

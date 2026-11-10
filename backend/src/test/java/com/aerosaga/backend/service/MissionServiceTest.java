@@ -232,12 +232,13 @@ public class MissionServiceTest {
                 .thenReturn(droneMissionWorkflow);
         when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Mission aborted = missionService.abortMission("m-1");
+        Mission result = missionService.abortMission("m-1");
 
-        assertNotNull(aborted);
-        assertEquals(MissionStatus.ABORTED, aborted.getStatus());
-        assertEquals("ABORTED", aborted.getRecoveryStatus());
-        assertEquals("Emergency abort - stopping mission", aborted.getCurrentStep());
+        assertNotNull(result);
+        // Status is ABORT_REQUESTED immediately — ABORTED comes later via getMissionProgress sync
+        assertEquals(MissionStatus.ABORT_REQUESTED, result.getStatus());
+        assertEquals("ABORT_REQUESTED", result.getRecoveryStatus());
+        assertEquals("Emergency abort requested - stopping mission", result.getCurrentStep());
         verify(droneMissionWorkflow).requestEmergencyAbort();
         verify(missionRepository).save(mission);
     }
@@ -250,11 +251,12 @@ public class MissionServiceTest {
                 .thenReturn(droneMissionWorkflow);
         when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Mission aborted = missionService.abortMission("m-1", "Adverse weather conditions");
+        Mission result = missionService.abortMission("m-1", "Adverse weather conditions");
 
-        assertEquals(MissionStatus.ABORTED, aborted.getStatus());
-        assertEquals("ABORTED", aborted.getRecoveryStatus());
-        assertEquals("Aborted: Adverse weather conditions", aborted.getCurrentStep());
+        // Immediately ABORT_REQUESTED with the provided reason in the step description
+        assertEquals(MissionStatus.ABORT_REQUESTED, result.getStatus());
+        assertEquals("ABORT_REQUESTED", result.getRecoveryStatus());
+        assertEquals("Abort requested: Adverse weather conditions", result.getCurrentStep());
         verify(droneMissionWorkflow).requestEmergencyAbort();
     }
 
@@ -308,6 +310,84 @@ public class MissionServiceTest {
         when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
 
         assertThrows(IllegalStateException.class, () -> missionService.abortMission("m-1"));
+    }
+
+    @Test
+    void testAbortMission_AbortRequestedMission_ThrowsException() {
+        // Abort signal already sent — mission is waiting for the drone to safely return
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ABORT_REQUESTED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> missionService.abortMission("m-1"));
+        assertEquals("Mission abort is already in progress", ex.getMessage());
+    }
+
+    @Test
+    void testAbortMission_SetsAbortRequestedNotAborted() {
+        // Verifies the two-phase lifecycle: service sets ABORT_REQUESTED right away,
+        // ABORTED is only set once the workflow finishes and getMissionProgress syncs it.
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.IN_PROGRESS, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(workflowClient.newWorkflowStub(eq(DroneMissionWorkflow.class), eq("mission-m-1")))
+                .thenReturn(droneMissionWorkflow);
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission result = missionService.abortMission("m-1");
+
+        assertEquals(MissionStatus.ABORT_REQUESTED, result.getStatus(),
+                "Status must be ABORT_REQUESTED immediately after the abort signal, not ABORTED");
+        assertNotEquals(MissionStatus.ABORTED, result.getStatus(),
+                "Status must NOT jump straight to ABORTED before the workflow finishes");
+        verify(droneMissionWorkflow).requestEmergencyAbort();
+    }
+
+    @Test
+    void testGetMissionProgress_SyncsAbortedStatusFromWorkflow() {
+        // Once the workflow finishes its safe-return, getMissionProgress should sync
+        // the final ABORTED status back into the DB.
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ABORT_REQUESTED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(workflowClient.newWorkflowStub(eq(DroneMissionWorkflow.class), eq("mission-m-1")))
+                .thenReturn(droneMissionWorkflow);
+
+        com.aerosaga.backend.workflow.MissionProgress workflowProgress =
+                new com.aerosaga.backend.workflow.MissionProgress(
+                        "m-1", "DR-01", MissionStatus.ABORTED, "Aborted", null, "ABORTED");
+        when(droneMissionWorkflow.getMissionProgress()).thenReturn(workflowProgress);
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission result = missionService.getMissionProgress("m-1");
+
+        // The sync should have written the final ABORTED state from the workflow
+        assertEquals(MissionStatus.ABORTED, result.getStatus());
+        assertEquals("Aborted", result.getCurrentStep());
+        assertEquals("ABORTED", result.getRecoveryStatus());
+        verify(droneMissionWorkflow).getMissionProgress();
+        verify(missionRepository).save(any(Mission.class));
+    }
+
+    @Test
+    void testGetMissionProgress_SyncsAbortingStatusFromWorkflow() {
+        // While safe-return is running the workflow reports ABORTING; that should
+        // be synced back to the DB as an intermediate state.
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ABORT_REQUESTED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(workflowClient.newWorkflowStub(eq(DroneMissionWorkflow.class), eq("mission-m-1")))
+                .thenReturn(droneMissionWorkflow);
+
+        com.aerosaga.backend.workflow.MissionProgress workflowProgress =
+                new com.aerosaga.backend.workflow.MissionProgress(
+                        "m-1", "DR-01", MissionStatus.ABORTING,
+                        "Aborting - returning drone to base", null, "ABORTING");
+        when(droneMissionWorkflow.getMissionProgress()).thenReturn(workflowProgress);
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission result = missionService.getMissionProgress("m-1");
+
+        assertEquals(MissionStatus.ABORTING, result.getStatus());
+        assertEquals("Aborting - returning drone to base", result.getCurrentStep());
+        assertEquals("ABORTING", result.getRecoveryStatus());
     }
 
     @Test

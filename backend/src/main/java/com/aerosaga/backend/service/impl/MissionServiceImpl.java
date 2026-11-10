@@ -398,11 +398,14 @@ WorkflowClient.start(
             throw new IllegalStateException("Failed to abort mission workflow: " + ex.getMessage(), ex);
         }
 
-        mission.setStatus(MissionStatus.ABORTED);
-        mission.setRecoveryStatus("ABORTED");
+        // Mark as ABORT_REQUESTED — the workflow is still executing safe-return/abort
+        // procedures. The status will transition to ABORTED only after the workflow
+        // finishes and getMissionProgress() syncs the final state back.
+        mission.setStatus(MissionStatus.ABORT_REQUESTED);
+        mission.setRecoveryStatus("ABORT_REQUESTED");
         mission.setCurrentStep(reason != null && !reason.isBlank()
-                ? "Aborted: " + reason
-                : "Emergency abort - stopping mission");
+                ? "Abort requested: " + reason
+                : "Emergency abort requested - stopping mission");
         mission.setUpdatedAt(LocalDateTime.now());
 
         return missionRepository.save(mission);
