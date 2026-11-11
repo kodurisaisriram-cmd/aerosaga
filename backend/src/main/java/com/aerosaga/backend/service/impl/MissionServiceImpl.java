@@ -88,6 +88,7 @@ public class MissionServiceImpl implements MissionService {
     }
 
     @Override
+    @Transactional
     public Mission getMissionProgress(String missionId) {
 
         if (missionId == null || missionId.isBlank()) {
@@ -140,12 +141,44 @@ public class MissionServiceImpl implements MissionService {
                     }
                 }
             } catch (Exception ex) {
-                // Graceful fallback: workflow might not be started yet or offline during testing
-                log.debug("Workflow query unavailable for mission {}: {}", missionId, ex.getMessage());
+                // If the workflow has already completed/closed (e.g. the abort finished and the
+                // workflow process exited before this poll), Temporal throws an exception whose
+                // message contains "not found" or "workflow execution already completed".
+                // In that case a mission that was waiting on ABORT_REQUESTED should be
+                // finalised to ABORTED so the status is never stuck in a transient state.
+                if (isWorkflowCompleted(ex)
+                        && mission.getStatus() == MissionStatus.ABORT_REQUESTED) {
+                    log.info("Workflow for mission {} has completed; finalising status to ABORTED", missionId);
+                    mission.setStatus(MissionStatus.ABORTED);
+                    mission.setRecoveryStatus("ABORTED");
+                    mission.setCurrentStep("Aborted");
+                    mission.setUpdatedAt(LocalDateTime.now());
+                    mission = missionRepository.save(mission);
+                } else {
+                    // Graceful fallback: Temporal server unreachable or workflow not started yet
+                    log.debug("Workflow query unavailable for mission {}: {}", missionId, ex.getMessage());
+                }
             }
         }
 
         return mission;
+    }
+
+    /**
+     * Returns true when a Temporal exception indicates the workflow execution has
+     * already finished (closed/completed/not-found), as opposed to the server
+     * simply being temporarily unreachable.
+     */
+    private boolean isWorkflowCompleted(Exception ex) {
+        String msg = ex.getMessage();
+        if (msg == null) {
+            return false;
+        }
+        String lower = msg.toLowerCase();
+        return lower.contains("not found")
+                || lower.contains("already completed")
+                || lower.contains("workflow execution already finished")
+                || lower.contains("no longer running");
     }
 
     @Override
@@ -186,6 +219,12 @@ public class MissionServiceImpl implements MissionService {
         } else if (status == MissionStatus.FAILED || status == MissionStatus.ABORTED) {
             mission.setRecoveryStatus(status.name());
             mission.setCurrentStep(status.name());
+        } else if (status == MissionStatus.ABORT_REQUESTED) {
+            mission.setRecoveryStatus("ABORT_REQUESTED");
+            mission.setCurrentStep("Emergency abort requested - stopping mission");
+        } else if (status == MissionStatus.ABORTING) {
+            mission.setRecoveryStatus("ABORTING");
+            mission.setCurrentStep("Aborting - returning drone to base");
         } else if (status == MissionStatus.ACTIVE || status == MissionStatus.IN_PROGRESS) {
             if (mission.getRecoveryStatus() == null || mission.getRecoveryStatus().isBlank()) {
                 mission.setRecoveryStatus("NOT_STARTED");
@@ -227,66 +266,66 @@ public class MissionServiceImpl implements MissionService {
         }
     }
 
-@Override
-public Mission updateMissionProgress(
-        String missionId,
-        Double progress,
-        String currentStep,
-        String recoveryStatus) {
+    @Override
+    public Mission updateMissionProgress(
+            String missionId,
+            Double progress,
+            String currentStep,
+            String recoveryStatus) {
 
-    // 1. Validate Mission ID
-    if (missionId == null || missionId.isBlank()) {
-        throw new IllegalArgumentException(
-                "Mission ID is required");
+        // 1. Validate Mission ID
+        if (missionId == null || missionId.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Mission ID is required");
+        }
+
+        // 2. Fetch Mission
+        Mission mission = missionRepository.findById(missionId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Mission not found: " + missionId));
+
+        // 3. Prevent updates to completed or terminated missions
+        if (mission.getStatus() == MissionStatus.COMPLETED) {
+            throw new IllegalStateException(
+                    "Cannot update progress of a completed mission");
+        }
+        if (mission.getStatus() == MissionStatus.ABORTED) {
+            throw new IllegalStateException(
+                    "Cannot update progress of an aborted mission");
+        }
+        if (mission.getStatus() == MissionStatus.FAILED) {
+            throw new IllegalStateException(
+                    "Cannot update progress of a failed mission");
+        }
+
+        // 4. Validate progress range
+        if (progress != null && (progress < 0 || progress > 100)) {
+            throw new IllegalArgumentException(
+                    "Progress must be between 0 and 100");
+        }
+
+        // 5. Update progress
+        if (progress != null) {
+            mission.setProgress(progress);
+        }
+
+        // 6. Update current step
+        if (currentStep != null && !currentStep.isBlank()) {
+            mission.setCurrentStep(currentStep);
+        }
+
+        // 7. Update recovery status
+        if (recoveryStatus != null && !recoveryStatus.isBlank()) {
+            mission.setRecoveryStatus(recoveryStatus);
+        }
+
+        // 8. Update timestamp
+        mission.setUpdatedAt(LocalDateTime.now());
+
+        // 9. Save updated mission
+        return missionRepository.save(mission);
     }
-
-    // 2. Fetch Mission
-    Mission mission = missionRepository.findById(missionId)
-            .orElseThrow(() ->
-                    new IllegalArgumentException(
-                            "Mission not found: " + missionId));
-
-    // 3. Prevent updates to completed or terminated missions
-    if (mission.getStatus() == MissionStatus.COMPLETED) {
-        throw new IllegalStateException(
-                "Cannot update progress of a completed mission");
-    }
-    if (mission.getStatus() == MissionStatus.ABORTED) {
-        throw new IllegalStateException(
-                "Cannot update progress of an aborted mission");
-    }
-    if (mission.getStatus() == MissionStatus.FAILED) {
-        throw new IllegalStateException(
-                "Cannot update progress of a failed mission");
-    }
-
-    // 4. Validate progress range
-    if (progress != null && (progress < 0 || progress > 100)) {
-        throw new IllegalArgumentException(
-                "Progress must be between 0 and 100");
-    }
-
-    // 5. Update progress
-    if (progress != null) {
-        mission.setProgress(progress);
-    }
-
-    // 6. Update current step
-    if (currentStep != null && !currentStep.isBlank()) {
-        mission.setCurrentStep(currentStep);
-    }
-
-    // 7. Update recovery status
-    if (recoveryStatus != null && !recoveryStatus.isBlank()) {
-        mission.setRecoveryStatus(recoveryStatus);
-    }
-
-    // 8. Update timestamp
-    mission.setUpdatedAt(LocalDateTime.now());
-
-    // 9. Save updated mission
-    return missionRepository.save(mission);
-}
 
 
     @Override
@@ -328,16 +367,16 @@ public Mission updateMissionProgress(
                                         TemporalWorkerConfig.TASK_QUEUE)
                                 .build());
 
-DroneMissionRequest request = new DroneMissionRequest(
-        mission.getDroneId(),
-        mission.getDestination()
-);
+        DroneMissionRequest request = new DroneMissionRequest(
+                mission.getDroneId(),
+                mission.getDestination()
+        );
 
-WorkflowClient.start(
-        workflow::executeMission,
-        mission.getMissionId(),
-        List.of(request)
-);
+        WorkflowClient.start(
+                workflow::executeMission,
+                mission.getMissionId(),
+                List.of(request)
+        );
 
         mission.setStatus(MissionStatus.ACTIVE);
         mission.setCurrentStep("Taking off");

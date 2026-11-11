@@ -447,4 +447,78 @@ public class MissionServiceTest {
                 () -> missionService.updateMissionProgress("m-1", 50.0, "Flying", "IN_PROGRESS"));
         assertTrue(ex.getMessage().contains("Cannot update progress of a failed mission"));
     }
+
+    // -------------------------------------------------------------------------
+    // Issue 2 — updateMissionStatus() must set correct side-effects for the
+    //           new abort lifecycle statuses (ABORT_REQUESTED / ABORTING)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void testUpdateMissionStatus_AbortRequested_SetsRecoveryStatusAndStep() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ACTIVE, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission updated = missionService.updateMissionStatus("m-1", MissionStatus.ABORT_REQUESTED);
+
+        assertEquals(MissionStatus.ABORT_REQUESTED, updated.getStatus());
+        assertEquals("ABORT_REQUESTED", updated.getRecoveryStatus());
+        assertEquals("Emergency abort requested - stopping mission", updated.getCurrentStep());
+    }
+
+    @Test
+    void testUpdateMissionStatus_Aborting_SetsRecoveryStatusAndStep() {
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ABORT_REQUESTED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission updated = missionService.updateMissionStatus("m-1", MissionStatus.ABORTING);
+
+        assertEquals(MissionStatus.ABORTING, updated.getStatus());
+        assertEquals("ABORTING", updated.getRecoveryStatus());
+        assertEquals("Aborting - returning drone to base", updated.getCurrentStep());
+    }
+
+    // -------------------------------------------------------------------------
+    // Issue 4 — getMissionProgress() must finalise to ABORTED when the
+    //           Temporal workflow has already closed (not just unreachable)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void testGetMissionProgress_WorkflowCompleted_SetsAborted() {
+        // Simulate the state where: abort was requested (DB = ABORT_REQUESTED) but
+        // by the time we poll, the workflow has already finished and Temporal throws
+        // a "not found" exception instead of returning live progress.
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ABORT_REQUESTED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(workflowClient.newWorkflowStub(eq(DroneMissionWorkflow.class), eq("mission-m-1")))
+                .thenThrow(new RuntimeException("Workflow not found"));
+        when(missionRepository.save(any(Mission.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Mission result = missionService.getMissionProgress("m-1");
+
+        // The service must detect "not found" as a workflow-completed signal and
+        // write the final ABORTED state so the status does not get stuck.
+        assertEquals(MissionStatus.ABORTED, result.getStatus(),
+                "Status must be finalised to ABORTED when the workflow has already completed");
+        assertEquals("ABORTED", result.getRecoveryStatus());
+        assertEquals("Aborted", result.getCurrentStep());
+        verify(missionRepository).save(any(Mission.class));
+    }
+
+    @Test
+    void testGetMissionProgress_WorkflowUnreachable_KeepsCurrentStatus() {
+        // "Temporal server unreachable" is a transient connectivity issue —
+        // in this case the status must NOT be changed.
+        Mission mission = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ABORT_REQUESTED, LocalDateTime.now());
+        when(missionRepository.findById("m-1")).thenReturn(Optional.of(mission));
+        when(workflowClient.newWorkflowStub(eq(DroneMissionWorkflow.class), eq("mission-m-1")))
+                .thenThrow(new RuntimeException("Temporal server unreachable"));
+
+        Mission result = missionService.getMissionProgress("m-1");
+
+        assertEquals(MissionStatus.ABORT_REQUESTED, result.getStatus(),
+                "Status must remain ABORT_REQUESTED when Temporal is merely unreachable");
+        verify(missionRepository, never()).save(any(Mission.class));
+    }
 }

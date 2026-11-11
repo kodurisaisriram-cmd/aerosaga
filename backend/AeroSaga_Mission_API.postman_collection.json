@@ -1,0 +1,452 @@
+{
+  "info": {
+    "name": "AeroSaga Mission Control API",
+    "_postman_id": "aerosaga-pr7-abort-lifecycle",
+    "description": "Full E2E test suite for PR #7 — covers the two-phase abort lifecycle (ABORT_REQUESTED → ABORTING → ABORTED) and all mission/telemetry endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080/api", "type": "string" },
+    { "key": "missionId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1 — Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+      }
+    },
+    {
+      "name": "2 — Create Mission",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 201', () => pm.response.to.have.status(201));",
+              "pm.test('Status is PENDING', () => {",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('PENDING');",
+              "  pm.expect(body.missionId).to.be.a('string');",
+              "  pm.collectionVariables.set('missionId', body.missionId);",
+              "  console.log('missionId set to:', body.missionId);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"droneId\": \"DR-01\",\n  \"source\": \"Warehouse-Alpha\",\n  \"destination\": \"Hospital-North\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/missions", "host": ["{{baseUrl}}"], "path": ["missions"] }
+      }
+    },
+    {
+      "name": "3 — Get All Missions",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/missions", "host": ["{{baseUrl}}"], "path": ["missions"] }
+      }
+    },
+    {
+      "name": "4 — Get Mission by ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Correct missionId', () => {",
+              "  pm.expect(pm.response.json().missionId).to.eql(pm.collectionVariables.get('missionId'));",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/missions/{{missionId}}", "host": ["{{baseUrl}}"], "path": ["missions", "{{missionId}}"] }
+      }
+    },
+    {
+      "name": "5 — Get Mission Status",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has status/progress/currentStep/recoveryStatus fields', () => {",
+              "  const b = pm.response.json();",
+              "  pm.expect(b).to.have.property('status');",
+              "  pm.expect(b).to.have.property('progress');",
+              "  pm.expect(b).to.have.property('currentStep');",
+              "  pm.expect(b).to.have.property('recoveryStatus');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/missions/{{missionId}}/status", "host": ["{{baseUrl}}"], "path": ["missions", "{{missionId}}", "status"] }
+      }
+    },
+    {
+      "name": "6 — Start Mission → ACTIVE",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Mission is ACTIVE', () => {",
+              "  pm.expect(pm.response.json().status).to.eql('ACTIVE');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/missions/{{missionId}}/start", "host": ["{{baseUrl}}"], "path": ["missions", "{{missionId}}", "start"] }
+      }
+    },
+    {
+      "name": "7 — Get Mission Progress (live Temporal sync)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has progress fields', () => {",
+              "  const b = pm.response.json();",
+              "  pm.expect(b).to.have.property('status');",
+              "  pm.expect(b).to.have.property('progress');",
+              "  pm.expect(b).to.have.property('currentStep');",
+              "  pm.expect(b).to.have.property('recoveryStatus');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/missions/{{missionId}}/progress", "host": ["{{baseUrl}}"], "path": ["missions", "{{missionId}}", "progress"] }
+      }
+    },
+    {
+      "name": "8 — Update Progress (manual patch)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Progress updated to 65', () => {",
+              "  pm.expect(pm.response.json().progress).to.eql(65.0);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"progress\": 65.0,\n  \"currentStep\": \"Navigating to destination\",\n  \"recoveryStatus\": \"IN_PROGRESS\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/missions/{{missionId}}/progress", "host": ["{{baseUrl}}"], "path": ["missions", "{{missionId}}", "progress"] }
+      }
+    },
+    {
+      "name": "9 — Update Status → RETURNING_TO_BASE",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Status RETURNING_TO_BASE with correct side-effects', () => {",
+              "  const b = pm.response.json();",
+              "  pm.expect(b.status).to.eql('RETURNING_TO_BASE');",
+              "  pm.expect(b.recoveryStatus).to.eql('RETURNING_TO_BASE');",
+              "  pm.expect(b.currentStep).to.eql('Returning to base');",
+              "  pm.expect(b.progress).to.be.at.least(90);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/missions/{{missionId}}/status?status=RETURNING_TO_BASE", "host": ["{{baseUrl}}"], "path": ["missions", "{{missionId}}", "status"], "query": [{ "key": "status", "value": "RETURNING_TO_BASE" }] }
+      }
+    },
+    {
+      "name": "10 — ⚠️ Abort Mission (two-phase lifecycle test)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// --- KEY TEST for PR #7 ---",
+              "// The abort endpoint MUST return ABORT_REQUESTED immediately.",
+              "// ABORTED only arrives later via getMissionProgress polling.",
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Status is ABORT_REQUESTED (not ABORTED)', () => {",
+              "  const b = pm.response.json();",
+              "  pm.expect(b.status).to.eql('ABORT_REQUESTED');",
+              "  pm.expect(b.status).to.not.eql('ABORTED');",
+              "  pm.expect(b.recoveryStatus).to.eql('ABORT_REQUESTED');",
+              "  pm.expect(b.currentStep).to.include('abort requested');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Severe weather alert\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/missions/{{missionId}}/abort", "host": ["{{baseUrl}}"], "path": ["missions", "{{missionId}}", "abort"] }
+      }
+    },
+    {
+      "name": "11 — Poll Progress After Abort (expect ABORTING or ABORTED)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Status is in abort lifecycle', () => {",
+              "  const b = pm.response.json();",
+              "  const validStatuses = ['ABORT_REQUESTED', 'ABORTING', 'ABORTED'];",
+              "  pm.expect(validStatuses).to.include(b.status);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/missions/{{missionId}}/progress", "host": ["{{baseUrl}}"], "path": ["missions", "{{missionId}}", "progress"] }
+      }
+    },
+    {
+      "name": "12 — Guard: Double Abort → 409 Conflict",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Returns 409 on double abort', () => pm.response.to.have.status(409));",
+              "pm.test('Error says abort already in progress', () => {",
+              "  pm.expect(pm.response.text()).to.include('already');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{}" },
+        "url": { "raw": "{{baseUrl}}/missions/{{missionId}}/abort", "host": ["{{baseUrl}}"], "path": ["missions", "{{missionId}}", "abort"] }
+      }
+    },
+    {
+      "name": "13 — Ingest Telemetry",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 201 or 200', () => {",
+              "  pm.expect([200, 201]).to.include(pm.response.code);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"droneId\": \"DR-01\",\n  \"missionId\": \"{{missionId}}\",\n  \"latitude\": 19.0760,\n  \"longitude\": 72.8777,\n  \"altitude\": 120.0,\n  \"batteryLevel\": 85.5\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/telemetry", "host": ["{{baseUrl}}"], "path": ["telemetry"] }
+      }
+    },
+    {
+      "name": "14 — Get Latest Telemetry",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('Has droneId', () => {",
+              "  pm.expect(pm.response.json().droneId).to.eql('DR-01');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/telemetry/drone/DR-01/latest", "host": ["{{baseUrl}}"], "path": ["telemetry", "drone", "DR-01", "latest"] }
+      }
+    },
+    {
+      "name": "— ERROR CASES —",
+      "item": [
+        {
+          "name": "E1 — Get Non-existent Mission → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 404', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/missions/DOES-NOT-EXIST", "host": ["{{baseUrl}}"], "path": ["missions", "DOES-NOT-EXIST"] }
+          }
+        },
+        {
+          "name": "E2 — Create Mission missing droneId → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error message correct', () => pm.expect(pm.response.text()).to.include('Drone ID'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"source\": \"A\",\n  \"destination\": \"B\"\n}" },
+            "url": { "raw": "{{baseUrl}}/missions", "host": ["{{baseUrl}}"], "path": ["missions"] }
+          }
+        },
+        {
+          "name": "E3 — Start Already-active Mission → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 409', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/missions/{{missionId}}/start", "host": ["{{baseUrl}}"], "path": ["missions", "{{missionId}}", "start"] }
+          }
+        },
+        {
+          "name": "E4 — Abort Completed Mission → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 409', () => pm.response.to.have.status(409));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{baseUrl}}/missions/{{missionId}}/abort", "host": ["{{baseUrl}}"], "path": ["missions", "{{missionId}}", "abort"] }
+          }
+        },
+        {
+          "name": "E5 — Progress out of range (> 100) → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error message correct', () => pm.expect(pm.response.text()).to.include('between 0 and 100'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{ \"progress\": 150.0 }" },
+            "url": { "raw": "{{baseUrl}}/missions/{{missionId}}/progress", "host": ["{{baseUrl}}"], "path": ["missions", "{{missionId}}", "progress"] }
+          }
+        }
+      ]
+    }
+  ]
+}

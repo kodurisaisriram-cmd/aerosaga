@@ -189,28 +189,54 @@ public class MissionControllerTest {
 
     @Test
     void testAbortMission_ReturnsOk() throws Exception {
-        Mission aborted = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ABORTED, 50.0, "Aborted", "ABORTED", LocalDateTime.now(), LocalDateTime.now());
-        when(missionService.abortMission(eq("m-1"), any())).thenReturn(aborted);
+        // The abort endpoint responds immediately with ABORT_REQUESTED.
+        // ABORTED is only set later once the workflow finishes and
+        // getMissionProgress() syncs the final state back.
+        Mission abortRequested = new Mission("m-1", "DR-01", "A", "B",
+                MissionStatus.ABORT_REQUESTED, 50.0,
+                "Emergency abort requested - stopping mission",
+                "ABORT_REQUESTED", LocalDateTime.now(), LocalDateTime.now());
+        when(missionService.abortMission(eq("m-1"), any())).thenReturn(abortRequested);
 
         mockMvc.perform(post("/api/missions/m-1/abort"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.missionId").value("m-1"))
-                .andExpect(jsonPath("$.status").value("ABORTED"))
-                .andExpect(jsonPath("$.recoveryStatus").value("ABORTED"));
+                .andExpect(jsonPath("$.status").value("ABORT_REQUESTED"))
+                .andExpect(jsonPath("$.recoveryStatus").value("ABORT_REQUESTED"));
     }
 
     @Test
     void testAbortMission_WithReason_ReturnsOk() throws Exception {
-        Mission aborted = new Mission("m-1", "DR-01", "A", "B", MissionStatus.ABORTED, 50.0, "Aborted: Weather hazard", "ABORTED", LocalDateTime.now(), LocalDateTime.now());
-        when(missionService.abortMission(eq("m-1"), eq("Weather hazard"))).thenReturn(aborted);
+        Mission abortRequested = new Mission("m-1", "DR-01", "A", "B",
+                MissionStatus.ABORT_REQUESTED, 50.0,
+                "Abort requested: Weather hazard",
+                "ABORT_REQUESTED", LocalDateTime.now(), LocalDateTime.now());
+        when(missionService.abortMission(eq("m-1"), eq("Weather hazard"))).thenReturn(abortRequested);
 
         mockMvc.perform(post("/api/missions/m-1/abort")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"reason\":\"Weather hazard\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.missionId").value("m-1"))
-                .andExpect(jsonPath("$.status").value("ABORTED"))
-                .andExpect(jsonPath("$.currentStep").value("Aborted: Weather hazard"));
+                .andExpect(jsonPath("$.status").value("ABORT_REQUESTED"))
+                .andExpect(jsonPath("$.currentStep").value("Abort requested: Weather hazard"));
+    }
+
+    @Test
+    void testAbortMission_ReturnsAbortRequested_NotAborted() throws Exception {
+        // Explicitly documents the two-phase contract at the HTTP layer:
+        // the endpoint MUST NOT return ABORTED immediately — it returns ABORT_REQUESTED.
+        Mission abortRequested = new Mission("m-1", "DR-01", "A", "B",
+                MissionStatus.ABORT_REQUESTED, 50.0,
+                "Emergency abort requested - stopping mission",
+                "ABORT_REQUESTED", LocalDateTime.now(), LocalDateTime.now());
+        when(missionService.abortMission(eq("m-1"), any())).thenReturn(abortRequested);
+
+        mockMvc.perform(post("/api/missions/m-1/abort"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ABORT_REQUESTED"))
+                // Status must NOT be the final ABORTED at this point
+                .andExpect(jsonPath("$.status").value(org.hamcrest.Matchers.not("ABORTED")));
     }
 
     @Test

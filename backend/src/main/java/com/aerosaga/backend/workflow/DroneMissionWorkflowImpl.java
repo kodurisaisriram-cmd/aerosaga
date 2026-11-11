@@ -27,7 +27,11 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
     private final Map<String, DroneProgress> droneProgress =
             new LinkedHashMap<>();
 
-    private volatile boolean emergencyAbortRequested = false;
+    // Temporal workflows execute on a single deterministic thread. Signals are
+    // delivered by the Temporal worker on the same workflow thread before the
+    // next workflow task begins, so no Java visibility guarantees (volatile/sync)
+    // are needed. Using volatile here would be incorrect and misleading.
+    private boolean emergencyAbortRequested = false;
 
 
     // Mission-level progress and recovery details
