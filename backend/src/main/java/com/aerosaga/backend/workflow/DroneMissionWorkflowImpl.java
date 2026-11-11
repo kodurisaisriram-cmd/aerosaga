@@ -203,6 +203,8 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             progress = Math.max(progress, 25.0);
 
             activities.takeoff(droneId);
+            // Simulate take-off duration (unblocks immediately if abort requested)
+            Workflow.await(Duration.ofSeconds(15), () -> emergencyAbortRequested);
 
             if (stopForEmergencyAbort(drone, droneId)) {
                 return;
@@ -214,6 +216,8 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             progress = Math.max(progress, 50.0);
 
             activities.navigate(droneId, destination);
+            // Simulate flight navigation duration (unblocks immediately if abort requested)
+            Workflow.await(Duration.ofSeconds(20), () -> emergencyAbortRequested);
 
             if (stopForEmergencyAbort(drone, droneId)) {
                 return;
@@ -226,6 +230,8 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
 
             try {
                 activities.dropPackage(droneId);
+                // Simulate package drop duration (unblocks immediately if abort requested)
+                Workflow.await(Duration.ofSeconds(15), () -> emergencyAbortRequested);
 
             } catch (ActivityFailure deliveryFailure) {
 
@@ -245,6 +251,7 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
                                 droneId);
 
                 activities.recoverDrone(droneId);
+                Workflow.await(Duration.ofSeconds(10), () -> emergencyAbortRequested);
 
                 if (stopForEmergencyAbort(drone, droneId)) {
                     return;
@@ -256,6 +263,7 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
                 recoveryStatus = "RETRYING_DELIVERY";
 
                 activities.dropPackage(droneId);
+                Workflow.await(Duration.ofSeconds(10), () -> emergencyAbortRequested);
             }
 
             if (stopForEmergencyAbort(drone, droneId)) {
@@ -270,6 +278,8 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             recoveryStatus = "RETURNING_TO_BASE";
 
             activities.returnToBase(droneId);
+            // Simulate return to base flight duration
+            Workflow.await(Duration.ofSeconds(15), () -> emergencyAbortRequested);
 
             drone.setCurrentStep("Completed");
             drone.setStatus(DroneStatus.COMPLETED);
@@ -328,6 +338,8 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             if (drone.getStatus() == DroneStatus.RUNNING) {
                 drone.setCurrentStep("Returning to base - aborting");
                 activities.returnToBase(droneId);
+                // Simulate safe-return flight duration so system stays in ABORTING state
+                Workflow.sleep(Duration.ofSeconds(10));
             }
             drone.setStatus(DroneStatus.ABORTED);
             drone.setCurrentStep("Aborted");

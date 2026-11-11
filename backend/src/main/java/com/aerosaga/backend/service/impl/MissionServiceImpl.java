@@ -434,6 +434,13 @@ public class MissionServiceImpl implements MissionService {
             log.info("Sent emergency abort signal to workflow mission-{}", missionId);
         } catch (Exception ex) {
             log.error("Could not signal workflow for mission {}: {}", missionId, ex.getMessage());
+            if (isWorkflowCompleted(ex)) {
+                // Workflow has already completed before the abort signal arrived
+                try {
+                    getMissionProgress(missionId);
+                } catch (Exception ignored) {}
+                throw new IllegalStateException("Cannot abort mission: workflow has already completed", ex);
+            }
             throw new IllegalStateException("Failed to abort mission workflow: " + ex.getMessage(), ex);
         }
 
