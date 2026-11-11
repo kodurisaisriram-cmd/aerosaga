@@ -2,6 +2,7 @@
 package com.aerosaga.backend.workflow;
 
 import io.temporal.workflow.QueryMethod;
+import io.temporal.workflow.SignalMethod;
 import io.temporal.workflow.WorkflowInterface;
 import io.temporal.workflow.WorkflowMethod;
 
@@ -18,4 +19,7 @@ public interface DroneMissionWorkflow {
 
     @QueryMethod
     MissionProgress getMissionProgress();
+
+    @SignalMethod
+    void requestEmergencyAbort();
 }

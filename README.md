@@ -85,9 +85,11 @@ Ensure the required services, including Temporal and PostgreSQL, are running and
 - Test the mission APIs and telemetry integration.
 - Confirm that workflow progress and status are reported as expected.
 
+
 ## Team Collaboration
 
 AeroSaga is a collaborative team project. The backend workflow, mission APIs, telemetry, and frontend are integrated through shared Git branches and reviewed changes.
+
 
 ## Current Scope
 
