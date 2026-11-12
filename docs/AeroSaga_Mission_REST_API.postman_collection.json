@@ -1,0 +1,353 @@
+{
+  "info": {
+    "_postman_id": "aerosaga-missions-collection-v3",
+    "name": "AeroSaga - Mission Progress & Recovery API",
+    "description": "Collection of REST endpoints for AeroSaga Mission Control, live progress tracking, and recovery status.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api",
+      "type": "string"
+    },
+    {
+      "key": "missionId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Create Mission",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.missionId) {",
+              "    pm.collectionVariables.set('missionId', jsonData.missionId);",
+              "}",
+              "pm.test('Status code is 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "pm.test('Initial status is PENDING', function () {",
+              "    pm.expect(jsonData.status).to.eql('PENDING');",
+              "    pm.expect(jsonData.recoveryStatus).to.eql('NOT_STARTED');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"droneId\": \"DR-02\",\n  \"source\": \"Warehouse-Alpha\",\n  \"destination\": \"Hospital-North\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/missions",
+          "host": ["{{baseUrl}}"],
+          "path": ["missions"]
+        }
+      }
+    },
+    {
+      "name": "2. Get All Missions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/missions",
+          "host": ["{{baseUrl}}"],
+          "path": ["missions"]
+        }
+      }
+    },
+    {
+      "name": "3. Start Mission",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Status transitioned to ACTIVE', function () {",
+              "    pm.expect(jsonData.status).to.eql('ACTIVE');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/missions/{{missionId}}/start",
+          "host": ["{{baseUrl}}"],
+          "path": ["missions", "{{missionId}}", "start"]
+        }
+      }
+    },
+    {
+      "name": "4. Get Mission Details by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/missions/{{missionId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["missions", "{{missionId}}"]
+        }
+      }
+    },
+    {
+      "name": "5. Get Mission Status & Recovery Status",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/missions/{{missionId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["missions", "{{missionId}}", "status"]
+        }
+      }
+    },
+    {
+      "name": "6. Get Dedicated Mission Progress",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/missions/{{missionId}}/progress",
+          "host": ["{{baseUrl}}"],
+          "path": ["missions", "{{missionId}}", "progress"]
+        }
+      }
+    },
+    {
+      "name": "7. Update Mission Status (RETURNING_TO_BASE)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/missions/{{missionId}}/status?status=RETURNING_TO_BASE",
+          "host": ["{{baseUrl}}"],
+          "path": ["missions", "{{missionId}}", "status"],
+          "query": [
+            {
+              "key": "status",
+              "value": "RETURNING_TO_BASE"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "8. Update Mission Progress",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"progress\": 95.0,\n  \"currentStep\": \"Approaching base landing pad\",\n  \"recoveryStatus\": \"RETURNING_TO_BASE\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/missions/{{missionId}}/progress",
+          "host": ["{{baseUrl}}"],
+          "path": ["missions", "{{missionId}}", "progress"]
+        }
+      }
+    },
+    {
+      "name": "9. Complete Mission",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/missions/{{missionId}}/status?status=COMPLETED",
+          "host": ["{{baseUrl}}"],
+          "path": ["missions", "{{missionId}}", "status"],
+          "query": [
+            {
+              "key": "status",
+              "value": "COMPLETED"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "10. Emergency Abort Mission",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Mission status is ABORTED', function () {",
+              "    pm.expect(jsonData.status).to.eql('ABORTED');",
+              "    pm.expect(jsonData.recoveryStatus).to.eql('ABORTED');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Severe weather warning / Operator triggered abort\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/missions/{{missionId}}/abort",
+          "host": ["{{baseUrl}}"],
+          "path": ["missions", "{{missionId}}", "abort"]
+        }
+      }
+    },
+    {
+      "name": "11. Ingest Drone Telemetry",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Telemetry persisted with ID', function () {",
+              "    pm.expect(jsonData.id).to.not.be.null;",
+              "    pm.expect(jsonData.droneId).to.eql('DR-02');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"droneId\": \"DR-02\",\n  \"missionId\": \"{{missionId}}\",\n  \"latitude\": 19.0760,\n  \"longitude\": 72.8777,\n  \"altitude\": 120.0,\n  \"batteryLevel\": 85.5\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/telemetry",
+          "host": ["{{baseUrl}}"],
+          "path": ["telemetry"]
+        }
+      }
+    },
+    {
+      "name": "12. Get Latest Drone Telemetry",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "var jsonData = pm.response.json();",
+              "pm.test('Returned latest telemetry for drone', function () {",
+              "    pm.expect(jsonData.droneId).to.eql('DR-02');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/telemetry/drone/DR-02/latest",
+          "host": ["{{baseUrl}}"],
+          "path": ["telemetry", "drone", "DR-02", "latest"]
+        }
+      }
+    }
+  ]
+}

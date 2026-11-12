@@ -14,9 +14,22 @@ public interface MissionService {
 
     Mission getMissionById(String missionId);
 
+    Mission getMissionProgress(String missionId);
+
     Mission updateMissionStatus(
             String missionId,
             MissionStatus status);
 
+    Mission updateMissionProgress(
+            String missionId,
+            Double progress,
+            String currentStep,
+            String recoveryStatus);
+
     Mission startMission(String missionId);
+
+    Mission abortMission(String missionId);
+
+    Mission abortMission(String missionId, String reason);
 }
+

@@ -104,7 +104,7 @@ export default function CesiumMap({ drones, selectedId, onSelect }: Props) {
           pixelOffset: new Cartesian2(0, -14),
           show: isSelected,
         },
-      });
+      } as any);
     });
   }, [drones, selectedId]);
 

@@ -7,5 +7,7 @@ public enum MissionStatus {
     FAILED,
     ABORT_REQUESTED,
     ABORTING,
+
     ABORTED,
+
 }

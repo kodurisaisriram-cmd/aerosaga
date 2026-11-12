@@ -3,10 +3,21 @@ package com.aerosaga.backend.workflow;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.aerosaga.backend.model.MissionStatus;
+
 public class MissionProgress {
+
     private String missionId;
     private MissionStatus status;
+
+    // Existing drone-level progress
     private List<DroneProgress> drones = new ArrayList<>();
+
+    // Mission-level progress and recovery details
+    private String droneId;
+    private String currentStep;
+    private Double progress;
+    private String recoveryStatus;
 
     public MissionProgress() {
     }
@@ -15,6 +26,18 @@ public class MissionProgress {
         this.missionId = missionId;
         this.status = missionStatus;
         this.drones = new ArrayList<>(drones);
+    }
+
+    // Constructor used by mission-level progress
+    public MissionProgress(String missionId, String droneId,
+                           MissionStatus status, String currentStep,
+                           Double progress, String recoveryStatus) {
+        this.missionId = missionId;
+        this.droneId = droneId;
+        this.status = status;
+        this.currentStep = currentStep;
+        this.progress = progress;
+        this.recoveryStatus = recoveryStatus;
     }
 
     public String getMissionId() {
