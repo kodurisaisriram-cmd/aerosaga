@@ -11,9 +11,9 @@ public class MissionProgress {
     public MissionProgress() {
     }
 
-    public MissionProgress(String missionId, MissionStatus status, List<DroneProgress> drones) {
+    public MissionProgress(String missionId, MissionStatus missionStatus, ArrayList drones) {
         this.missionId = missionId;
-        this.status = status;
+        this.status = missionStatus;
         this.drones = new ArrayList<>(drones);
     }
 
@@ -39,5 +39,17 @@ public class MissionProgress {
 
     public void setDrones(List<DroneProgress> drones) {
         this.drones = drones;
+    }
+
+    public void setRecoveryStatus(String recoveryStatus) {
+        throw new UnsupportedOperationException("Unimplemented method 'setRecoveryStatus'");
+    }
+
+    public void setProgress(Double progress) {
+        throw new UnsupportedOperationException("Unimplemented method 'setProgress'");
+    }
+
+    public void setCurrentStep(String currentStep) {
+        throw new UnsupportedOperationException("Unimplemented method 'setCurrentStep'");
     }
 }

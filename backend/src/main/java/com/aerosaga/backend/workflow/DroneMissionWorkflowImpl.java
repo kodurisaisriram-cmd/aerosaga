@@ -179,7 +179,7 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
         /*
          * Initialize mission.
          */
-        this.missionStatus = MissionStatus.RUNNING;
+        this.missionStatus = MissionStatus.IN_PROGRESS;
         this.currentStep = "Taking off";
         this.progress = 10.0;
         this.recoveryStatus = "NOT_STARTED";
@@ -492,7 +492,7 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             progress = Math.max(progress, 90.0);
 
             missionStatus =
-                    MissionStatus.RETURNING_TO_BASE;
+                    MissionStatus.COMPLETED;
 
             recoveryStatus =
                     "RETURNING_TO_BASE";
@@ -784,11 +784,7 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
          * Create a snapshot first.
          */
         MissionProgress snapshot =
-                new MissionProgress(
-                        missionId,
-                        missionStatus,
-                        new ArrayList<>(
-                                droneProgress.values()));
+                new MissionProgress();
 
         /*
          * Add mission-level progress details.
