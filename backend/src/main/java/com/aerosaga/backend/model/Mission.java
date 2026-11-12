@@ -34,11 +34,23 @@ public class Mission {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "progress")
+    private Double progress;
+
+    @Column(name = "current_step")
+    private String currentStep;
+
+    @Column(name = "recovery_status")
+    private String recoveryStatus;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     // No-argument constructor
     public Mission() {
     }
 
-    // Parameterized constructor
+    // Parameterized constructor (backward-compatible)
     public Mission(String missionId, String droneId, String source,
                    String destination, MissionStatus status,
                    LocalDateTime createdAt) {
@@ -49,6 +61,29 @@ public class Mission {
         this.destination = destination;
         this.status = status;
         this.createdAt = createdAt;
+        this.progress = 0.0;
+        this.currentStep = "Pending";
+        this.recoveryStatus = "NOT_STARTED";
+        this.updatedAt = createdAt;
+    }
+
+    // Full Parameterized constructor
+    public Mission(String missionId, String droneId, String source,
+                   String destination, MissionStatus status,
+                   Double progress, String currentStep,
+                   String recoveryStatus, LocalDateTime createdAt,
+                   LocalDateTime updatedAt) {
+
+        this.missionId = missionId;
+        this.droneId = droneId;
+        this.source = source;
+        this.destination = destination;
+        this.status = status;
+        this.progress = progress;
+        this.currentStep = currentStep;
+        this.recoveryStatus = recoveryStatus;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
     // Getters and Setters
@@ -99,5 +134,37 @@ public class Mission {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Double getProgress() {
+        return progress;
+    }
+
+    public void setProgress(Double progress) {
+        this.progress = progress;
+    }
+
+    public String getCurrentStep() {
+        return currentStep;
+    }
+
+    public void setCurrentStep(String currentStep) {
+        this.currentStep = currentStep;
+    }
+
+    public String getRecoveryStatus() {
+        return recoveryStatus;
+    }
+
+    public void setRecoveryStatus(String recoveryStatus) {
+        this.recoveryStatus = recoveryStatus;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }
