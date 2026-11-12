@@ -492,7 +492,7 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             progress = Math.max(progress, 90.0);
 
             missionStatus =
-                    MissionStatus.RETURNING_TO_BASE;
+                    MissionStatus.COMPLETED;
 
             recoveryStatus =
                     "RETURNING_TO_BASE";
@@ -772,8 +772,28 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
         return true;
     }
 
+    /*
+     * ============================================================
+     * GET MISSION PROGRESS
+     * ============================================================
+     */
     @Override
     public MissionProgress getMissionProgress() {
-        throw new UnsupportedOperationException("Unimplemented method 'getMissionProgress'");
+
+        /*
+         * Create a snapshot first.
+         */
+        MissionProgress snapshot =
+                new MissionProgress();
+
+        /*
+         * Add mission-level progress details.
+         */
+        snapshot.setCurrentStep(currentStep);
+        snapshot.setProgress(progress);
+        snapshot.setRecoveryStatus(
+                recoveryStatus);
+
+        return snapshot;
     }
 }

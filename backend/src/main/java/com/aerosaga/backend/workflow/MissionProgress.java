@@ -22,11 +22,9 @@ public class MissionProgress {
     public MissionProgress() {
     }
 
-    // Existing constructor used by DroneMissionWorkflowImpl
-    public MissionProgress(String missionId, MissionStatus status,
-                           List<DroneProgress> drones) {
+    public MissionProgress(String missionId, MissionStatus missionStatus, ArrayList drones) {
         this.missionId = missionId;
-        this.status = status;
+        this.status = missionStatus;
         this.drones = new ArrayList<>(drones);
     }
 
@@ -66,35 +64,15 @@ public class MissionProgress {
         this.drones = drones;
     }
 
-    public String getDroneId() {
-        return droneId;
-    }
-
-    public void setDroneId(String droneId) {
-        this.droneId = droneId;
-    }
-
-    public String getCurrentStep() {
-        return currentStep;
-    }
-
-    public void setCurrentStep(String currentStep) {
-        this.currentStep = currentStep;
-    }
-
-    public Double getProgress() {
-        return progress;
+    public void setRecoveryStatus(String recoveryStatus) {
+        throw new UnsupportedOperationException("Unimplemented method 'setRecoveryStatus'");
     }
 
     public void setProgress(Double progress) {
-        this.progress = progress;
+        throw new UnsupportedOperationException("Unimplemented method 'setProgress'");
     }
 
-    public String getRecoveryStatus() {
-        return recoveryStatus;
-    }
-
-    public void setRecoveryStatus(String recoveryStatus) {
-        this.recoveryStatus = recoveryStatus;
+    public void setCurrentStep(String currentStep) {
+        throw new UnsupportedOperationException("Unimplemented method 'setCurrentStep'");
     }
 }
