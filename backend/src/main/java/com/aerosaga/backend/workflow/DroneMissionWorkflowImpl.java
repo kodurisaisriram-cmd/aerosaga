@@ -1,13 +1,15 @@
-
 package com.aerosaga.backend.workflow;
 
 import com.aerosaga.backend.activity.DroneActivity;
 import com.aerosaga.backend.model.MissionStatus;
 
+import io.temporal.activity.ActivityCancellationType;
 import io.temporal.activity.ActivityOptions;
 import io.temporal.common.RetryOptions;
 import io.temporal.failure.ActivityFailure;
+import io.temporal.failure.CanceledFailure;
 import io.temporal.workflow.Async;
+import io.temporal.workflow.CancellationScope;
 import io.temporal.workflow.Promise;
 import io.temporal.workflow.Workflow;
 
@@ -24,8 +26,11 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
     private MissionStatus missionStatus = MissionStatus.PENDING;
     private String missionId;
 
+    private boolean emergencyAbortRequested = false;
+
     private final Map<String, DroneProgress> droneProgress =
             new LinkedHashMap<>();
+
 
     // Temporal workflows execute on a single deterministic thread. Signals are
     // delivered by the Temporal worker on the same workflow thread before the
@@ -33,17 +38,27 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
     // are needed. Using volatile here would be incorrect and misleading.
     private boolean emergencyAbortRequested = false;
 
-
     // Mission-level progress and recovery details
     private String currentStep = "Pending";
     private Double progress = 0.0;
     private String recoveryStatus = "NOT_STARTED";
+
+    /*
+     * Stores the currently running activity cancellation scope
+     * for each drone.
+     */
+    private final Map<String, CancellationScope> activeActivityScopes =
+            new LinkedHashMap<>();
+
 
     private final DroneActivity activities =
             Workflow.newActivityStub(
                     DroneActivity.class,
                     ActivityOptions.newBuilder()
                             .setStartToCloseTimeout(Duration.ofSeconds(30))
+                            .setHeartbeatTimeout(Duration.ofSeconds(2))
+                            .setCancellationType(
+                                    ActivityCancellationType.WAIT_CANCELLATION_COMPLETED)
                             .setRetryOptions(
                                     RetryOptions.newBuilder()
                                             .setInitialInterval(Duration.ofSeconds(1))
@@ -52,6 +67,34 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
                                             .setMaximumAttempts(3)
                                             .build())
                             .build());
+
+    /*
+     * Emergency abort signal handler.
+     */
+    @Override
+    public void requestEmergencyAbort() {
+
+        if (missionStatus == MissionStatus.RUNNING
+                && !emergencyAbortRequested) {
+
+            emergencyAbortRequested = true;
+            missionStatus = MissionStatus.ABORT_REQUESTED;
+
+            Workflow.getLogger(DroneMissionWorkflowImpl.class)
+                    .warn(
+                            "Emergency abort requested for mission {}",
+                            missionId);
+
+            /*
+             * Cancel currently running activities for all drones.
+             */
+            for (CancellationScope scope :
+                    new ArrayList<>(activeActivityScopes.values())) {
+
+                scope.cancel();
+            }
+        }
+    }
 
     @Override
     public void executeMission(
@@ -68,6 +111,8 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
         }
 
         if (requests == null || requests.isEmpty()) {
+
+        if (requests == null || requests.isEmpty()) {
             this.missionId = missionId;
             this.missionStatus = MissionStatus.FAILED;
             this.currentStep = "Failed: At least one drone is required";
@@ -79,17 +124,23 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
 
         this.missionId = missionId;
 
+        droneProgress.clear();
+        activeActivityScopes.clear();
+
+
         // Safely validate drone requests so replayed or invalid executions complete as FAILED
         boolean hasInvalidDrone = false;
         String invalidReason = null;
         Set<String> droneIds = new HashSet<>();
 
         for (DroneMissionRequest request : requests) {
+
             if (request == null
                     || request.getDroneId() == null
                     || request.getDroneId().isBlank()
                     || request.getDestination() == null
                     || request.getDestination().isBlank()) {
+
                 hasInvalidDrone = true;
                 invalidReason = "Drone ID and destination are required";
                 break;
@@ -99,6 +150,8 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
                 hasInvalidDrone = true;
                 invalidReason = "Duplicate drone ID: " + request.getDroneId();
                 break;
+            }
+
             }
         }
 
@@ -128,24 +181,38 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
                             DroneStatus.PENDING));
         }
 
+
+        missionStatus = emergencyAbortRequested
+                ? MissionStatus.ABORT_REQUESTED
+                : MissionStatus.RUNNING;
+
         Workflow.getLogger(DroneMissionWorkflowImpl.class)
-                .info("Mission {} started with {} drones",
-                        missionId, requests.size());
+                .info(
+                        "Mission {} started with {} drones",
+                        missionId,
+                        requests.size());
 
         // Start every drone mission asynchronously.
         List<Promise<Void>> dronePromises = new ArrayList<>();
 
         for (DroneMissionRequest request : requests) {
+
             dronePromises.add(
                     Async.procedure(
                             () -> executeSingleDroneMission(request)));
         }
 
         // Wait for all drone missions to finish.
-        Promise.allOf(dronePromises.toArray(new Promise<?>[0])).get();
+        Promise.allOf(
+                dronePromises.toArray(
+                        new Promise<?>[0]))
+                .get();
 
         boolean allCompleted = true;
+
         int completedCount = 0;
+        boolean anyFailed = false;
+        boolean anyAborted = false;
 
         for (DroneProgress drone : droneProgress.values()) {
 
@@ -154,23 +221,44 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             } else {
                 allCompleted = false;
             }
+
+            if (drone.getStatus() == DroneStatus.FAILED) {
+                anyFailed = true;
+            }
+
+            if (drone.getStatus() == DroneStatus.ABORTED) {
+                anyAborted = true;
+            }
         }
 
         if (emergencyAbortRequested) {
+            for (DroneProgress drone : droneProgress.values()) {
+                if (drone.getStatus() != DroneStatus.COMPLETED
+                        && drone.getStatus() != DroneStatus.FAILED) {
+                    drone.setStatus(DroneStatus.ABORTED);
+                    drone.setCurrentStep("Aborted");
+                    anyAborted = true;
+                }
+            }
+        }
+
+        if (anyFailed) {
+            missionStatus = MissionStatus.FAILED;
+            currentStep = "Failed";
+            progress = (completedCount * 100.0) / requests.size();
+            recoveryStatus = "FAILED";
+
+        } else if (emergencyAbortRequested || anyAborted) {
             missionStatus = MissionStatus.ABORTED;
             currentStep = "Aborted";
             recoveryStatus = "ABORTED";
-            for (DroneProgress drone : droneProgress.values()) {
-                if (drone.getStatus() != DroneStatus.COMPLETED && drone.getStatus() != DroneStatus.FAILED) {
-                    drone.setStatus(DroneStatus.ABORTED);
-                    drone.setCurrentStep("Aborted");
-                }
-            }
+
         } else if (allCompleted) {
             missionStatus = MissionStatus.COMPLETED;
             currentStep = "Completed";
             progress = 100.0;
             recoveryStatus = "COMPLETED";
+
         } else {
             missionStatus = MissionStatus.FAILED;
             currentStep = "Failed";
@@ -178,15 +266,20 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             recoveryStatus = "FAILED";
         }
 
+        }
+
         Workflow.getLogger(DroneMissionWorkflowImpl.class)
-                .info("Mission {} finished with status: {}",
-                        missionId, missionStatus);
+                .info(
+                        "Mission {} finished with status: {}",
+                        missionId,
+                        missionStatus);
     }
 
-    private void executeSingleDroneMission(DroneMissionRequest request) {
+
 
         String droneId = request.getDroneId();
         String destination = request.getDestination();
+
 
         DroneProgress drone = droneProgress.get(droneId);
 
@@ -202,9 +295,12 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             currentStep = "Taking off";
             progress = Math.max(progress, 25.0);
 
-            activities.takeoff(droneId);
-            // Simulate take-off duration (unblocks immediately if abort requested)
-            Workflow.await(Duration.ofSeconds(15), () -> emergencyAbortRequested);
+            executeCancelableActivity(
+                    droneId,
+                    () -> activities.takeoff(droneId));
+
+            Workflow.await(Duration.ofSeconds(15),
+                    () -> emergencyAbortRequested);
 
             if (stopForEmergencyAbort(drone, droneId)) {
                 return;
@@ -215,9 +311,12 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             currentStep = "Navigating";
             progress = Math.max(progress, 50.0);
 
-            activities.navigate(droneId, destination);
-            // Simulate flight navigation duration (unblocks immediately if abort requested)
-            Workflow.await(Duration.ofSeconds(20), () -> emergencyAbortRequested);
+            executeCancelableActivity(
+                    droneId,
+                    () -> activities.navigate(droneId, destination));
+
+            Workflow.await(Duration.ofSeconds(20),
+                    () -> emergencyAbortRequested);
 
             if (stopForEmergencyAbort(drone, droneId)) {
                 return;
@@ -225,13 +324,18 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
 
             drone.setCurrentStep("Delivering package");
 
+
             currentStep = "Delivering package";
             progress = Math.max(progress, 75.0);
 
             try {
-                activities.dropPackage(droneId);
-                // Simulate package drop duration (unblocks immediately if abort requested)
-                Workflow.await(Duration.ofSeconds(15), () -> emergencyAbortRequested);
+
+                executeCancelableActivity(
+                        droneId,
+                        () -> activities.dropPackage(droneId));
+
+                Workflow.await(Duration.ofSeconds(15),
+                        () -> emergencyAbortRequested);
 
             } catch (ActivityFailure deliveryFailure) {
 
@@ -245,25 +349,37 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
                 currentStep = "Recovering drone";
                 recoveryStatus = "RECOVERING";
 
+
                 Workflow.getLogger(DroneMissionWorkflowImpl.class)
                         .warn(
                                 "Delivery failed for drone {}. Starting recovery.",
                                 droneId);
 
-                activities.recoverDrone(droneId);
-                Workflow.await(Duration.ofSeconds(10), () -> emergencyAbortRequested);
+
+                executeCancelableActivity(
+                        droneId,
+                        () -> activities.recoverDrone(droneId));
+
+                Workflow.await(Duration.ofSeconds(10),
+                        () -> emergencyAbortRequested);
 
                 if (stopForEmergencyAbort(drone, droneId)) {
+
                     return;
                 }
 
                 drone.setCurrentStep(
                         "Recovery completed - retrying delivery");
 
+
                 recoveryStatus = "RETRYING_DELIVERY";
 
-                activities.dropPackage(droneId);
-                Workflow.await(Duration.ofSeconds(10), () -> emergencyAbortRequested);
+                executeCancelableActivity(
+                        droneId,
+                        () -> activities.dropPackage(droneId));
+
+                Workflow.await(Duration.ofSeconds(10),
+                        () -> emergencyAbortRequested);
             }
 
             if (stopForEmergencyAbort(drone, droneId)) {
@@ -277,28 +393,90 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
             missionStatus = MissionStatus.RETURNING_TO_BASE;
             recoveryStatus = "RETURNING_TO_BASE";
 
-            activities.returnToBase(droneId);
-            // Simulate return to base flight duration
-            Workflow.await(Duration.ofSeconds(15), () -> emergencyAbortRequested);
+            executeCancelableActivity(
+                    droneId,
+                    () -> activities.returnToBase(droneId));
+
+            Workflow.await(Duration.ofSeconds(15),
+                    () -> emergencyAbortRequested);
+
+            if (stopForEmergencyAbort(drone, droneId)) {
+                return;
+            }
+
 
             drone.setCurrentStep("Completed");
             drone.setStatus(DroneStatus.COMPLETED);
 
             Workflow.getLogger(DroneMissionWorkflowImpl.class)
-                    .info("Drone {} completed mission {}",
-                            droneId, missionId);
+                    .info(
+                            "Drone {} completed mission {}",
+                            droneId,
+                            missionId);
+
+        } catch (CanceledFailure cancellation) {
+
+            /*
+             * Temporal activity was cancelled.
+             * Handle the emergency abort separately.
+             */
+            if (emergencyAbortRequested) {
+
+                Workflow.getLogger(DroneMissionWorkflowImpl.class)
+                        .warn(
+                                "Running activity cancelled for drone {}",
+                                droneId);
+
+                stopForEmergencyAbort(progress, droneId);
+
+            } else {
+
+                progress.setStatus(DroneStatus.FAILED);
+                progress.setCurrentStep("Activity cancelled");
+
+                Workflow.getLogger(DroneMissionWorkflowImpl.class)
+                        .warn(
+                                "Activity cancelled unexpectedly for drone {}",
+                                droneId);
+            }
 
         } catch (RuntimeException exception) {
 
-            drone.setStatus(DroneStatus.FAILED);
-            drone.setCurrentStep("Failed");
 
-            currentStep = "Failed";
-            recoveryStatus = "FAILED";
+            if (drone.getStatus() != DroneStatus.ABORTED) {
+
+                drone.setStatus(DroneStatus.FAILED);
+                drone.setCurrentStep("Failed");
+
+                currentStep = "Failed";
+                recoveryStatus = "FAILED";
+
+                Workflow.getLogger(DroneMissionWorkflowImpl.class)
+                        .error(
+                                "Drone {} failed in mission {}",
+                                droneId,
+                                missionId,
+                                exception);
+            }
+        }
+    }
+
+    /*
+     * Handles emergency abort and performs a separate
+     * return-to-base operation after the interrupted activity.
+     */
+    private boolean stopForEmergencyAbort(
+            DroneProgress drone,
+            String droneId) {
+
 
             Workflow.getLogger(DroneMissionWorkflowImpl.class)
-                    .error("Drone {} failed in mission {}",
-                            droneId, missionId, exception);
+                    .error(
+                            "Emergency safety operation failed for drone {}",
+                            droneId,
+                            safetyFailure);
+
+            return true;
         }
     }
 
@@ -360,8 +538,10 @@ public class DroneMissionWorkflowImpl implements DroneMissionWorkflow {
     @Override
     public MissionProgress getMissionProgress() {
 
+
         // Preserve teammate's drone-level progress list.
-        MissionProgress snapshot = new MissionProgress(
+        return new MissionProgress(
+
                 missionId,
                 missionStatus,
                 new ArrayList<>(droneProgress.values()));
